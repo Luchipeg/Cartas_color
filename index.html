@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selector de Colores - Final Deluxe Canvas Grande</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  #canvas-container { position: relative; display: inline-block; border: 1px solid #ccc; margin-bottom: 10px; }
+  canvas { max-width: 800px; max-height: 450px; }
+  #color-info { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+  #color-preview { width: 30px; height: 30px; border: 1px solid #000; }
+  #form-float { position: absolute; display: none; background: #fff; border: 1px solid #ccc; padding: 5px; border-radius: 5px; z-index: 10; }
+  #board { display: flex; overflow-x: auto; gap: 10px; margin-top: 20px; padding-bottom: 10px; }
+  .color-card { border: 1px solid #ccc; padding: 5px; text-align: center; border-radius: 5px; min-width: 80px; flex-shrink: 0; position: relative; font-size: 12px; }
+  .color-square { width: 60px; height: 60px; margin: auto; border: 1px solid #000; border-radius: 5px; }
+  .card-buttons { margin-top: 5px; display: flex; justify-content: center; gap: 5px; }
+  button { cursor: pointer; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h2>Selector de Colores - Final Deluxe Canvas Grande</h2>
+
+<input type="file" id="imageLoader" accept="image/*">
+<div id="canvas-container">
+  <canvas id="imageCanvas"></canvas>
+  <div id="form-float">
+    <input type="text" id="cardNumber" placeholder="Número de carta">
+  </div>
+</div>
+
+<div id="color-info">
+  <span>Código HEX: <span id="hexColor">#FFFFFF</span></span>
+  <div id="color-preview"></div>
+</div>
+
+<div style="margin-top:10px;">
+  <button id="sortHue">Ordenar por matiz</button>
+  <button id="sortSaturation">Ordenar por saturación</button>
+  <button id="sortLightness">Ordenar por luminosidad</button>
+  <button id="toggleAutoSort">Autoorden: OFF</button>
+  <button id="exportCSV">Exportar CSV</button>
+  <button id="exportJSON">Exportar JSON</button>
+</div>
+
+<div id="board"></div>
+
+<script>
+let canvas = document.getElementById('imageCanvas');
+let ctx = canvas.getContext('2d');
+let imageLoader = document.getElementById('imageLoader');
+let hexColorSpan = document.getElementById('hexColor');
+let colorPreview = document.getElementById('color-preview');
+let formFloat = document.getElementById('form-float');
+let cardNumberInput = document.getElementById('cardNumber');
+let board = document.getElementById('board');
+let autoSort = false;
+
+let currentColor = '#FFFFFF';
+let colorEntries = [];
+let currentEntry = null;
+
+imageLoader.addEventListener('change', function(e){
+  let reader = new FileReader();
+  reader.onload = function(event){
+    let img = new Image();
+    img.onload = function(){
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    }
+    img.src = event.target.result;
+  }
+  reader.readAsDataURL(e.target.files[0]);     
+});
+
+// Coordenadas escaladas correctamente
+canvas.addEventListener('click', function(e){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = Math.floor((e.clientX - rect.left) * scaleX);
+  const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+  const pixel = ctx.getImageData(x, y, 1, 1).data;
+  currentColor = rgbToHex(pixel[0], pixel[1], pixel[2]);
+  hexColorSpan.textContent = currentColor;
+  colorPreview.style.backgroundColor = currentColor;
+
+  formFloat.style.left = `${e.clientX + 10}px`;
+  formFloat.style.top = `${e.clientY + 10}px`;
+  formFloat.style.display = 'block';
+  cardNumberInput.value = '';
+  cardNumberInput.focus();
+});
+
+cardNumberInput.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){
+    let cardNum = cardNumberInput.value.trim();
+    if(!cardNum) return;
+
+    if(currentEntry){ 
+      currentEntry.cardNum = cardNum;
+      currentEntry.cardDiv.querySelector('.card-num').textContent = cardNum;
+    } else { 
+      let hsl = hexToHSL(currentColor);
+      let cardDiv = document.createElement('div');
+      cardDiv.className = 'color-card';
+      cardDiv.innerHTML = `
+        <div class="color-square" style="background:${currentColor}"></div>
+        <div class="card-num">${cardNum}</div>
+        <div class="card-hex">${currentColor}</div>
+        <div class="card-buttons">
+          <button class="editBtn">Editar</button>
+          <button class="deleteBtn">Borrar</button>
+        </div>
+      `;
+      let entry = {cardNum, hex: currentColor, hsl, cardDiv};
+      colorEntries.push(entry);
+      addCardButtons(entry);
+      board.appendChild(cardDiv);
+
+      if(autoSort) sortBoard(autoSortProp);
+    }
+
+    currentEntry = null;
+    cardNumberInput.value = '';
+    cardNumberInput.focus();
+  }
+});
+
+function addCardButtons(entry){
+  let cardDiv = entry.cardDiv;
+  cardDiv.querySelector('.deleteBtn').addEventListener('click', ()=>{
+    board.removeChild(cardDiv);
+    colorEntries = colorEntries.filter(e=>e!==entry);
+  });
+  cardDiv.querySelector('.editBtn').addEventListener('click', ()=>{
+    currentEntry = entry;
+    currentColor = entry.hex;
+    hexColorSpan.textContent = currentColor;
+    colorPreview.style.backgroundColor = currentColor;
+    formFloat.style.display = 'block';
+    cardNumberInput.value = entry.cardNum;
+    cardNumberInput.focus();
+  });
+}
+
+// Sorting
+let autoSortProp = null;
+document.getElementById('sortHue').addEventListener('click', ()=>{ autoSortProp='h'; sortBoard('h'); });
+document.getElementById('sortSaturation').addEventListener('click', ()=>{ autoSortProp='s'; sortBoard('s'); });
+document.getElementById('sortLightness').addEventListener('click', ()=>{ autoSortProp='l'; sortBoard('l'); });
+
+document.getElementById('toggleAutoSort').addEventListener('click', ()=>{
+  autoSort = !autoSort;
+  document.getElementById('toggleAutoSort').textContent = autoSort ? 'Autoorden: ON' : 'Autoorden: OFF';
+});
+
+function sortBoard(prop){
+  colorEntries.sort((a,b)=>a.hsl[prop]-b.hsl[prop]);
+  colorEntries.forEach(e=>board.appendChild(e.cardDiv));
+}
+
+// Exportar CSV
+document.getElementById('exportCSV').addEventListener('click', ()=>{
+  let csv = 'Número de carta,HEX,H,S,L\n';
+  colorEntries.forEach(e=>{
+    csv += `${e.cardNum},${e.hex},${e.hsl.h},${e.hsl.s},${e.hsl.l}\n`;
+  });
+  downloadFile(csv,'colores.csv','text/csv');
+});
+
+// Exportar JSON
+document.getElementById('exportJSON').addEventListener('click', ()=>{
+  let json = JSON.stringify(colorEntries.map(e=>({cardNum:e.cardNum,hex:e.hex,h:e.hsl.h,s:e.hsl.s,l:e.hsl.l})),null,2);
+  downloadFile(json,'colores.json','application/json');
+});
+
+function downloadFile(content, fileName, contentType){
+  let a = document.createElement('a');
+  let file = new Blob([content], {type: contentType});
+  a.href = URL.createObjectURL(file);
+  a.download = fileName;
+  a.click();
+}
+
+// Helpers
+function rgbToHex(r,g,b){
+  return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+function hexToHSL(H){
+  let r = parseInt(H.substring(1,3),16)/255;
+  let g = parseInt(H.substring(3,5),16)/255;
+  let b = parseInt(H.substring(5,7),16)/255;
+  let cmin = Math.min(r,g,b);
+  let cmax = Math.max(r,g,b);
+  let delta = cmax - cmin;
+  let h=0,s=0,l=0;
+  l = (cmax + cmin)/2;
+  if(delta!==0){
+    s = delta / (1 - Math.abs(2*l -1));
+    switch(cmax){
+      case r: h = ((g - b)/delta)%6; break;
+      case g: h = ((b - r)/delta)+2; break;
+      case b: h = ((r - g)/delta)+4; break;
+    }
+    h = Math.round(h*60);
+    if(h<0) h+=360;
+  }
+  s = +(s*100).toFixed(1);
+  l = +(l*100).toFixed(1);
+  return {h,s,l};
+}
+</script>
+
+</body>
+</html>
