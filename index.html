@@ -1,113 +1,32 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Gestor de colores - Deluxe Compatible Safari</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de colores - PWA iPad</title>
 <style>
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  margin: 16px;
-  background: #f5f5f5;
-}
-h1 { font-size: 20px; margin-bottom: 12px; }
-.box {
-  background: #fff;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-canvas {
-  display: block;
-  width: 100%;
-  max-width: 700px;
-  border: 1px solid #ccc;
-  touch-action: none;
-}
-.lupa {
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  border: 2px solid #333;
-  border-radius: 50%;
-  overflow: hidden;
-  display: none;
-  pointer-events: none;
-  z-index: 1000;
-}
-.lupa canvas {
-  position: absolute;
-  width: 240px;
-  height: 240px;
-}
-.floating-input {
-  position: absolute;
-  background: #fff;
-  border: 1px solid #333;
-  padding: 4px;
-  border-radius: 4px;
-  display: none;
-  z-index: 1001;
-}
-.floating-input input {
-  width: 80px;
-  margin-right: 4px;
-}
-button {
-  padding: 6px 10px;
-  margin-right: 4px;
-  margin-bottom:4px;
-}
-.collection-select {
-  margin-bottom: 8px;
-}
-.family-title {
-  font-weight: bold;
-  margin-top: 12px;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.grid-cell {
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  text-align: center;
-  padding: 4px;
-  position: relative;
-}
-.color-box {
-  width: 40px;
-  height: 40px;
-  margin: auto;
-  border: 1px solid #000;
-  border-radius: 4px;
-}
-.cell-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 2px;
-  margin-top: 2px;
-}
-.cell-buttons button{
-  padding:2px 4px;
-  font-size:10px;
-}
-.scrollable{
-  max-height:400px;
-  overflow-y:auto;
-  border:1px solid #ccc;
-  padding:4px;
-  border-radius:4px;
-  background:#fafafa;
-}
+body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin:16px; background:#f5f5f5; }
+h1{ font-size:20px; margin-bottom:12px; }
+.box{ background:#fff; padding:12px; border-radius:8px; margin-bottom:16px;}
+canvas{ display:block; width:100%; max-width:700px; border:1px solid #ccc; touch-action:none; }
+.lupa{ position:absolute; width:120px; height:120px; border:2px solid #333; border-radius:50%; overflow:hidden; display:none; pointer-events:none; z-index:1000;}
+.lupa canvas{ position:absolute; width:240px; height:240px; }
+.floating-input{ position:absolute; background:#fff; border:1px solid #333; padding:4px; border-radius:4px; display:none; z-index:1001; }
+.floating-input input{ width:80px; margin-right:4px; }
+button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
+.collection-select{ margin-bottom:8px; }
+.family-title{ font-weight:bold; margin-top:12px; }
+.grid{ display:grid; grid-template-columns:repeat(10,1fr); gap:8px; margin-bottom:16px; }
+.grid-cell{ background:#fff; border:1px solid #ccc; border-radius:4px; text-align:center; padding:4px; position:relative; }
+.color-box{ width:40px; height:40px; margin:auto; border:1px solid #000; border-radius:4px; }
+.cell-buttons{ display:flex; justify-content:center; gap:2px; margin-top:2px; }
+.cell-buttons button{ padding:2px 4px; font-size:10px; }
+.scrollable{ max-height:400px; overflow-y:auto; border:1px solid #ccc; padding:4px; border-radius:4px; background:#fafafa; }
 </style>
 </head>
 <body>
-<h1>Gestor de colores - Deluxe Compatible Safari</h1>
+
+<h1>Gestor de colores - PWA iPad</h1>
 
 <div class="box">
   <label>Colección: 
@@ -117,7 +36,7 @@ button {
 </div>
 
 <div class="box">
-  <input type="file" id="imageInput" accept="image/png, image/jpeg" />
+  <input type="file" id="imageInput" accept="image/png, image/jpeg">
   <canvas id="canvas"></canvas>
 
   <div class="lupa" id="lupa">
@@ -141,25 +60,22 @@ button {
 </div>
 
 <script>
-const imageInput = document.getElementById("imageInput");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const lupaDiv = document.getElementById("lupa");
-const lupaCanvas = document.getElementById("lupaCanvas");
-const lupaCtx = lupaCanvas.getContext("2d");
-const floatingInput = document.getElementById("floatingInput");
-const cardNumberInput = document.getElementById("cardNumber");
-const saveButton = document.getElementById("saveColor");
-const collectionSelect = document.getElementById("collectionSelect");
-const newCollectionBtn = document.getElementById("newCollectionBtn");
-const collectionsContainer = document.getElementById("collectionsContainer");
+const imageInput=document.getElementById("imageInput");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+const lupaDiv=document.getElementById("lupa");
+const lupaCanvas=document.getElementById("lupaCanvas");
+const lupaCtx=lupaCanvas.getContext("2d");
+const floatingInput=document.getElementById("floatingInput");
+const cardNumberInput=document.getElementById("cardNumber");
+const saveButton=document.getElementById("saveColor");
+const collectionSelect=document.getElementById("collectionSelect");
+const newCollectionBtn=document.getElementById("newCollectionBtn");
+const collectionsContainer=document.getElementById("collectionsContainer");
 
-let currentImage = null;
-let currentColor = null;
-let clickX=0, clickY=0;
-let currentCollection = null;
+let currentImage=null, currentColor=null, clickX=0, clickY=0, currentCollection=null;
 
-const families = [
+const families=[
   {name:"Rojos", min:345, max:15},
   {name:"Naranjas", min:16, max:45},
   {name:"Amarillos", min:46, max:75},
@@ -170,7 +86,7 @@ const families = [
   {name:"Magenta", min:286, max:344},
 ];
 
-let collections = JSON.parse(localStorage.getItem("colorCollections")||"{}");
+let collections=JSON.parse(localStorage.getItem("colorCollections")||"{}");
 
 function updateCollectionSelect(){
   collectionSelect.innerHTML="";
@@ -180,13 +96,13 @@ function updateCollectionSelect(){
     collectionSelect.appendChild(opt);
   }
   if(collectionSelect.options.length>0){
-    currentCollection = collectionSelect.value;
+    currentCollection=collectionSelect.value;
     renderCollection();
   }
 }
 
 newCollectionBtn.addEventListener("click", ()=>{
-  const name = prompt("Nombre de la nueva colección:");
+  const name=prompt("Nombre de la nueva colección:");
   if(name && !collections[name]){
     collections[name]={};
     saveCollections();
@@ -198,7 +114,7 @@ newCollectionBtn.addEventListener("click", ()=>{
 });
 
 collectionSelect.addEventListener("change",()=>{
-  currentCollection = collectionSelect.value;
+  currentCollection=collectionSelect.value;
   renderCollection();
 });
 
@@ -206,31 +122,26 @@ function saveCollections(){
   localStorage.setItem("colorCollections", JSON.stringify(collections));
 }
 
-// ======= Carga de imagen compatible Safari/iPad =======
+// ======= Carga de imagen local (iPad compatible) =======
 imageInput.addEventListener("change", ()=>{
-  const file = imageInput.files[0];
+  const file=imageInput.files[0];
   if(!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const img = new Image();
-    img.onload = function(){
-      // Escalado si es muy grande
-      const maxWidth = 800;
-      const maxHeight = 600;
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      const scale = Math.min(maxWidth/w, maxHeight/h, 1);
-      canvas.width = w * scale;
-      canvas.height = h * scale;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const maxWidth=800, maxHeight=600;
+      let w=img.naturalWidth, h=img.naturalHeight;
+      const scale=Math.min(maxWidth/w, maxHeight/h,1);
+      canvas.width=w*scale;
+      canvas.height=h*scale;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.drawImage(img,0,0,canvas.width,canvas.height);
-      currentImage = img;
+      currentImage=img;
     };
-    img.onerror = function(){
-      alert("Error al cargar la imagen. Intenta exportarla de nuevo como PNG/JPG.");
-    };
-    img.src = e.target.result;
+    img.onerror=function(){ alert("Error al cargar la imagen. Intenta exportarla de nuevo como PNG/JPG."); };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 });
@@ -241,7 +152,7 @@ function hexToHSL(H){
   let r=parseInt(H.substring(1,3),16)/255;
   let g=parseInt(H.substring(3,5),16)/255;
   let b=parseInt(H.substring(5,7),16)/255;
-  let cmin=Math.min(r,g,b),cmax=Math.max(r,g,b),delta=cmax-cmin;
+  let cmin=Math.min(r,g,b), cmax=Math.max(r,g,b), delta=cmax-cmin;
   let h=0,s=0,l=(cmax+cmin)/2;
   if(delta!==0){
     if(cmax===r) h=((g-b)/delta)%6;
@@ -256,9 +167,8 @@ function hexToHSL(H){
 
 function getFamily(h){
   for(let f of families){
-    if(f.min>f.max){
-      if(h>=f.min || h<=f.max) return f.name;
-    }else if(h>=f.min && h<=f.max) return f.name;
+    if(f.min>f.max){ if(h>=f.min || h<=f.max) return f.name; }
+    else if(h>=f.min && h<=f.max) return f.name;
   }
   return "Otros";
 }
@@ -277,8 +187,7 @@ canvas.addEventListener("click",(e)=>{
 
   // Lupa
   const zoom=2,lupaSize=120,srcSize=lupaSize/zoom;
-  const sx=Math.max(0,clickX-srcSize/2);
-  const sy=Math.max(0,clickY-srcSize/2);
+  const sx=Math.max(0,clickX-srcSize/2), sy=Math.max(0,clickY-srcSize/2);
   lupaCtx.clearRect(0,0,lupaCanvas.width,lupaCanvas.height);
   lupaCtx.drawImage(canvas,sx,sy,srcSize,srcSize,0,0,lupaCanvas.width,lupaCanvas.height);
   lupaDiv.style.left=(e.pageX-lupaSize/2)+"px";
@@ -330,10 +239,7 @@ function renderCollection(){
         <button onclick="editColor('${f.name}',${index})">✎</button>
         <button onclick="deleteColor('${f.name}',${index})">🗑</button>
       </div>`;
-      cell.dataset.h=c.h;
-      cell.dataset.s=c.s;
-      cell.dataset.l=c.l;
-      cell.dataset.number=c.number;
+      cell.dataset.h=c.h; cell.dataset.s=c.s; cell.dataset.l=c.l; cell.dataset.number=c.number;
       grid.appendChild(cell);
     });
     collectionsContainer.appendChild(grid);
@@ -357,9 +263,7 @@ window.deleteColor=(family,index)=>{
 function sortAll(prop){
   if(!currentCollection) return;
   const data=collections[currentCollection];
-  for(let f in data){
-    data[f].sort((a,b)=>a[prop]-b[prop]);
-  }
+  for(let f in data) data[f].sort((a,b)=>a[prop]-b[prop]);
   saveCollections();
   renderCollection();
 }
@@ -385,5 +289,6 @@ function exportNumbers(){
 // ===== Inicializar =====
 updateCollectionSelect();
 </script>
+
 </body>
 </html>
