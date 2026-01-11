@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestor de colores PWA - Simple</title>
+<title>Gestor de colores - Preciso</title>
 <style>
 body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin:16px; background:#f5f5f5; }
 h1{ font-size:20px; margin-bottom:12px; }
@@ -28,7 +28,7 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 </head>
 <body>
 
-<h1>Gestor de colores - Simple</h1>
+<h1>Gestor de colores - Preciso</h1>
 
 <div class="box">
   <label>Colección: 
@@ -235,8 +235,16 @@ function pickColor(x,y){
   selectedColor={hex};
   colorPreview.style.background=hex;
 
-  floatingInput.style.left=(x+10)+"px";
-  floatingInput.style.top=(y+10)+"px";
+  // Posiciona la caja evitando que se salga de la pantalla
+  let left=x+10;
+  let top=y+10;
+  const boxWidth=floatingInput.offsetWidth;
+  const boxHeight=floatingInput.offsetHeight;
+  if(left+boxWidth>window.innerWidth) left=window.innerWidth-boxWidth-10;
+  if(top+boxHeight>window.innerHeight) top=window.innerHeight-boxHeight-10;
+
+  floatingInput.style.left=left+"px";
+  floatingInput.style.top=top+"px";
   floatingInput.style.display="flex";
   colorNumberInput.value="";
   colorNumberInput.focus();
