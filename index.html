@@ -23,6 +23,15 @@ main {
   padding: 10px;
 }
 
+.controls {
+  margin-bottom: 10px;
+}
+
+.controls button {
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+
 #canvasContainer {
   position: relative;
   max-width: 100%;
@@ -81,15 +90,6 @@ canvas {
   width: 100%;
   padding: 6px;
 }
-
-.controls {
-  margin-bottom: 10px;
-}
-
-.controls button {
-  margin-right: 6px;
-  margin-bottom: 6px;
-}
 </style>
 </head>
 
@@ -105,7 +105,6 @@ canvas {
   <input type="file" id="imageInput" accept="image/*">
   <button onclick="startCalibration('black')">Calibrar negro</button>
   <button onclick="startCalibration('white')">Calibrar blanco</button>
-  <button onclick="startCalibration('gray')">Calibrar gris</button>
 </div>
 
 <div id="canvasContainer">
@@ -137,11 +136,8 @@ const pickerUI = document.getElementById('pickerUI');
 const colorPreview = document.getElementById('colorPreview');
 
 let img = new Image();
-let scale = 1;
-let offsetX = 0;
-let offsetY = 0;
-
-let calibration = null;
+let calibrationMode = null;
+let calibrationOffset = { r: 0, g: 0, b: 0 };
 let lastColor = null;
 
 document.getElementById('imageInput').addEventListener('change', e => {
@@ -157,20 +153,20 @@ img.onload = () => {
 };
 
 function startCalibration(type) {
-  calibration = { type, ref: null };
-  alert('Selecciona el color de referencia en la imagen');
+  calibrationMode = type;
+  alert('Selecciona el color en la imagen para calibrar');
 }
 
 canvas.addEventListener('pointermove', e => {
   const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const x = Math.round((e.clientX - rect.left) * (canvas.width / rect.width));
+  const y = Math.round((e.clientY - rect.top) * (canvas.height / rect.height));
 
-  const size = 15;
   loupe.style.display = 'block';
   loupe.style.left = e.clientX - rect.left + 20 + 'px';
   loupe.style.top = e.clientY - rect.top - 140 + 'px';
 
+  const size = 15;
   loupeCtx.imageSmoothingEnabled = false;
   loupeCtx.clearRect(0,0,120,120);
   loupeCtx.drawImage(canvas, x-size, y-size, size*2, size*2, 0, 0, 120, 120);
@@ -182,9 +178,9 @@ canvas.addEventListener('pointermove', e => {
 canvas.addEventListener('pointerdown', e => {
   if (!lastColor) return;
 
-  if (calibration && !calibration.ref) {
-    calibration.ref = lastColor;
-    applyCalibrationOffset();
+  if (calibrationMode) {
+    applyCalibrationOffset(lastColor, calibrationMode);
+    calibrationMode = null;
     alert('Calibración aplicada');
     return;
   }
@@ -198,31 +194,28 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 function applyCalibration(pixel) {
-  if (!calibration || !calibration.offset) return pixel;
   return [
-    clamp(pixel[0] + calibration.offset.r),
-    clamp(pixel[1] + calibration.offset.g),
-    clamp(pixel[2] + calibration.offset.b)
+    clamp(pixel[0] + calibrationOffset.r),
+    clamp(pixel[1] + calibrationOffset.g),
+    clamp(pixel[2] + calibrationOffset.b)
   ];
 }
 
-function applyCalibrationOffset() {
-  let target;
-  if (calibration.type === 'black') target = [0,0,0];
-  if (calibration.type === 'white') target = [255,255,255];
-  if (calibration.type === 'gray') target = [128,128,128];
+function applyCalibrationOffset(pixel, type) {
+  const target = type === 'black'
+    ? [0,0,0]
+    : [255,255,255];
 
-  calibration.offset = {
-    r: target[0] - calibration.ref[0],
-    g: target[1] - calibration.ref[1],
-    b: target[2] - calibration.ref[2]
+  calibrationOffset = {
+    r: target[0] - pixel[0],
+    g: target[1] - pixel[1],
+    b: target[2] - pixel[2]
   };
 }
 
 function saveColor() {
   const num = document.getElementById('colorNumber').value;
   const name = document.getElementById('colorName').value;
-  if (!num && !name) return;
 
   console.log({
     number: num,
