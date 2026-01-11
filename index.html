@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -222,7 +222,7 @@ function moveLupa(x,y){
   lupaCtx.drawImage(canvas,sx,sy,lw/zoom,lh/zoom,0,0,lw,lh);
 }
 
-// ===== Selección de color =====
+// ===== Selección de color único =====
 function pickColor(x,y){
   if(!currentImage) return;
   const rect=canvas.getBoundingClientRect();
@@ -235,7 +235,6 @@ function pickColor(x,y){
   selectedColor={hex};
   colorPreview.style.background=hex;
 
-  // Mostrar input flotante cerca del clic
   floatingInput.style.left=(x+10)+"px";
   floatingInput.style.top=(y+10)+"px";
   floatingInput.style.display="flex";
