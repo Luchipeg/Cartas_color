@@ -175,14 +175,14 @@ function getFamily(h){
   return "Otros";
 }
 
-// ===== Click en canvas =====
-canvas.addEventListener("click",(e)=>{
+// ===== Lupa y touch =====
+function showLupa(touch){
   if(!currentImage) return;
   const rect=canvas.getBoundingClientRect();
   const scaleX=canvas.width/rect.width;
   const scaleY=canvas.height/rect.height;
-  clickX=Math.floor((e.clientX-rect.left)*scaleX);
-  clickY=Math.floor((e.clientY-rect.top)*scaleY);
+  clickX=Math.floor((touch.clientX-rect.left)*scaleX);
+  clickY=Math.floor((touch.clientY-rect.top)*scaleY);
 
   const pixel=ctx.getImageData(clickX,clickY,1,1).data;
   currentColor=rgbToHex(pixel[0],pixel[1],pixel[2]);
@@ -193,17 +193,22 @@ canvas.addEventListener("click",(e)=>{
   const sx=Math.max(0,clickX-srcSize/2), sy=Math.max(0,clickY-srcSize/2);
   lupaCtx.clearRect(0,0,lupaCanvas.width,lupaCanvas.height);
   lupaCtx.drawImage(canvas,sx,sy,srcSize,srcSize,0,0,lupaCanvas.width,lupaCanvas.height);
-  lupaDiv.style.left=(e.pageX-lupaSize/2)+"px";
-  lupaDiv.style.top=(e.pageY-lupaSize/2)+"px";
+  lupaDiv.style.left=(touch.pageX-lupaSize/2)+"px";
+  lupaDiv.style.top=(touch.pageY-lupaSize/2)+"px";
   lupaDiv.style.display="block";
 
-  // Floating input
-  floatingInput.style.left=(e.pageX+10)+"px";
-  floatingInput.style.top=(e.pageY-10)+"px";
-  cardNumberInput.value="";
-  floatingInput.style.display="block";
-  cardNumberInput.focus();
-});
+  // Floating input only on start
+  if(!floatingInput.style.display || floatingInput.style.display=="none"){
+    floatingInput.style.left=(touch.pageX+10)+"px";
+    floatingInput.style.top=(touch.pageY-10)+"px";
+    cardNumberInput.value="";
+    floatingInput.style.display="block";
+    cardNumberInput.focus();
+  }
+}
+
+canvas.addEventListener("touchstart",(e)=>{ e.preventDefault(); showLupa(e.touches[0]); });
+canvas.addEventListener("touchmove",(e)=>{ e.preventDefault(); showLupa(e.touches[0]); });
 
 // ===== Guardar color =====
 saveButton.addEventListener("click",()=>{
