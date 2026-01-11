@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestor de colores preciso</title>
+<title>Gestor de colores avanzado</title>
 <style>
 body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin:16px; background:#f5f5f5; }
-h1{ font-size:20px; margin-bottom:12px; }
+h1,h2{ margin-bottom:8px; }
 .box{ background:#fff; padding:12px; border-radius:8px; margin-bottom:16px;}
 canvas{ display:block; width:100%; max-width:700px; border:1px solid #ccc; touch-action:none; }
 .lupa{ position:absolute; width:100px; height:100px; border:2px solid #333; border-radius:50%; overflow:hidden; display:none; pointer-events:none; z-index:1000; }
@@ -18,17 +18,19 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 .collection-select{ margin-bottom:8px; }
 .family-title{ font-weight:bold; margin-top:12px; }
 .grid{ display:grid; grid-template-columns:repeat(10,1fr); gap:8px; margin-bottom:16px; }
-.grid-cell{ background:#fff; border:1px solid #ccc; border-radius:4px; text-align:center; padding:4px; position:relative; }
+.grid-cell{ background:#fff; border:1px solid #ccc; border-radius:4px; text-align:center; padding:4px; position:relative; cursor:pointer;}
 .color-box{ width:40px; height:40px; margin:auto; border:1px solid #000; border-radius:4px; }
 .cell-buttons{ display:flex; justify-content:center; gap:2px; margin-top:2px; }
 .cell-buttons button{ padding:2px 4px; font-size:10px; }
 .scrollable{ max-height:400px; overflow-y:auto; border:1px solid #ccc; padding:4px; border-radius:4px; background:#fafafa; }
-.palette-box{ width:30px; height:30px; display:inline-block; margin:2px; border-radius:4px; border:1px solid #000;}
+.palette-box{ width:60px; height:60px; display:inline-block; margin:2px; border-radius:4px; border:1px solid #000; vertical-align:top; font-size:10px; text-align:center; line-height:14px; overflow:hidden;}
+.palette-color{ width:100%; height:50%; border-bottom:1px solid #000;}
+.palette-label{ height:50%; line-height:14px;}
 </style>
 </head>
 <body>
 
-<h1>Gestor de colores preciso</h1>
+<h1>Gestor de colores avanzado</h1>
 
 <div class="box">
   <label>Colección: 
@@ -145,7 +147,6 @@ imageInput.addEventListener("change", ()=>{
   reader.onload=function(e){
     const img=new Image();
     img.onload=function(){
-      // Ajustar canvas al tamaño real de la imagen y mantener ratio
       canvas.width=img.naturalWidth;
       canvas.height=img.naturalHeight;
       canvas.style.width=Math.min(img.naturalWidth,700)+"px";
@@ -233,7 +234,6 @@ function pickColor(x,y){
   selectedColor={hex};
   colorPreview.style.background=hex;
 
-  // Posiciona la caja evitando que se salga de la pantalla
   let left=x+10;
   let top=y+10;
   const boxWidth=floatingInput.offsetWidth;
@@ -246,8 +246,6 @@ function pickColor(x,y){
   floatingInput.style.display="flex";
   colorNumberInput.value="";
   colorNumberInput.focus();
-
-  generatePalettes(hex);
 }
 
 canvas.addEventListener("mousedown",(e)=>{ moveLupa(e.clientX,e.clientY); pickColor(e.clientX,e.clientY); });
@@ -302,6 +300,11 @@ function renderCollection(){
         <button onclick="deleteColor('${f.name}',${index})">🗑</button>
       </div>`;
       cell.dataset.h=c.h; cell.dataset.s=c.s; cell.dataset.l=c.l; cell.dataset.number=c.number;
+      // Al hacer clic en la celda se generan las paletas
+      cell.addEventListener("click",(e)=>{
+        if(e.target.tagName.toLowerCase()==="button") return; // ignorar botones
+        generatePalettesFromCollection(c);
+      });
       grid.appendChild(cell);
     });
     collectionsContainer.appendChild(grid);
@@ -348,19 +351,36 @@ function exportNumbers(){
   URL.revokeObjectURL(url);
 }
 
-// ===== Paletas =====
-function generatePalettes(hex){
+// ===== Paletas desde colección =====
+function generatePalettesFromCollection(color){
   paletteContainer.innerHTML="";
-  const hsl=hexToHSL(hex);
-  for(let i=0;i<5;i++){
-    let h=(hsl.h + i*30)%360; 
-    let s=Math.min(100,hsl.s+ (i%2===0?10:-10));
-    let l=Math.min(100,hsl.l+ (i%2===0?10:-10));
-    let palHex=hslToHex(h,s,l);
-    const div=document.createElement("div");
-    div.className="palette-box";
-    div.style.background=palHex;
-    paletteContainer.appendChild(div);
+  if(!currentCollection) return;
+  const data=collections[currentCollection];
+  let allColors=[];
+  for(let f in data) allColors.push(...data[f]);
+  // Crear 4-5 paletas distintas
+  for(let p=0;p<5;p++){
+    const palette=document.createElement("div");
+    palette.style.display="flex";
+    palette.style.marginBottom="8px";
+    palette.style.flexWrap="wrap";
+
+    // Elegimos 5 colores que “combinan” (más cercanos en matiz, saturación y luminosidad)
+    const sorted=allColors.slice().sort((a,b)=>{
+      const dh=Math.abs(a.h-color.h);
+      const ds=Math.abs(a.s-color.s);
+      const dl=Math.abs(a.l-color.l);
+      return (dh+ds+dl) - (Math.random()*30); // mezcla con algo de aleatoriedad
+    }).slice(0,5);
+
+    sorted.forEach(c=>{
+      const div=document.createElement("div");
+      div.className="palette-box";
+      div.innerHTML=`<div class="palette-color" style="background:${c.hex}"></div>
+      <div class="palette-label">${c.number}</div>`;
+      palette.appendChild(div);
+    });
+    paletteContainer.appendChild(palette);
   }
 }
 
