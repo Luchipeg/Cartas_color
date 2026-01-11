@@ -25,7 +25,8 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 .scrollable{ max-height:400px; overflow-y:auto; border:1px solid #ccc; padding:4px; border-radius:4px; background:#fafafa; }
 .palette-box{ width:30px; height:30px; display:inline-block; margin:2px; border-radius:4px; border:1px solid #000;}
 .multi-selected{ display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; border:1px dashed #333; padding:4px; border-radius:4px; background:#fafafa;}
-.multi-color-box{ width:30px; height:30px; border:1px solid #000; border-radius:4px;}
+.multi-color-box{ width:30px; height:30px; border:1px solid #000; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer;}
+.multi-color-box button{ position:absolute; top:0; right:0; padding:0; margin:0; border:none; background:rgba(255,255,255,0.7); cursor:pointer; border-radius:50%;}
 </style>
 </head>
 <body>
@@ -50,8 +51,9 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 </div>
 
 <div class="box">
+  <p>Introduce nombres o números de los colores seleccionados separados por <strong>comas</strong> (ej: 23,A12,Rojo pastel)</p>
+  <input type="text" id="multiNumbers" placeholder="23,A12,Rojo pastel...">
   <button id="saveMultiBtn">Guardar selección</button>
-  <input type="text" id="multiNumbers" placeholder="Números/nombres separados por comas">
   <div id="multiSelected" class="multi-selected"></div>
 </div>
 
@@ -81,7 +83,6 @@ const collectionSelect=document.getElementById("collectionSelect");
 const newCollectionBtn=document.getElementById("newCollectionBtn");
 const collectionsContainer=document.getElementById("collectionsContainer");
 const paletteContainer=document.getElementById("paletteContainer");
-
 const saveMultiBtn=document.getElementById("saveMultiBtn");
 const multiNumbersInput=document.getElementById("multiNumbers");
 const multiSelectedDiv=document.getElementById("multiSelected");
@@ -235,10 +236,20 @@ canvas.addEventListener("touchend",(e)=>{ lupaDiv.style.display="none"; });
 
 function renderMultiSelected(){
   multiSelectedDiv.innerHTML="";
-  multiColors.forEach(c=>{
+  multiColors.forEach((c,i)=>{
     const div=document.createElement("div");
     div.className="multi-color-box";
     div.style.background=c.hex;
+
+    const delBtn=document.createElement("button");
+    delBtn.textContent="×";
+    delBtn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      multiColors.splice(i,1);
+      renderMultiSelected();
+    });
+
+    div.appendChild(delBtn);
     multiSelectedDiv.appendChild(div);
   });
 }
