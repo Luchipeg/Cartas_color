@@ -1,9 +1,9 @@
- <!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestor de colores PWA - Lupa + Selección múltiple</title>
+<title>Gestor de colores PWA - Simple</title>
 <style>
 body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin:16px; background:#f5f5f5; }
 h1{ font-size:20px; margin-bottom:12px; }
@@ -24,14 +24,11 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 .cell-buttons button{ padding:2px 4px; font-size:10px; }
 .scrollable{ max-height:400px; overflow-y:auto; border:1px solid #ccc; padding:4px; border-radius:4px; background:#fafafa; }
 .palette-box{ width:30px; height:30px; display:inline-block; margin:2px; border-radius:4px; border:1px solid #000;}
-.multi-selected{ display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; border:1px dashed #333; padding:4px; border-radius:4px; background:#fafafa;}
-.multi-color-box{ width:30px; height:30px; border:1px solid #000; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer;}
-.multi-color-box button{ position:absolute; top:0; right:0; padding:0; margin:0; border:none; background:rgba(255,255,255,0.7); cursor:pointer; border-radius:50%;}
 </style>
 </head>
 <body>
 
-<h1>Gestor de colores - Lupa + Selección múltiple</h1>
+<h1>Gestor de colores - Simple</h1>
 
 <div class="box">
   <label>Colección: 
@@ -50,11 +47,10 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
   </div>
 </div>
 
-<div class="box">
-  <p>Introduce nombres o números de los colores seleccionados separados por <strong>comas</strong> (ej: 23,A12,Rojo pastel)</p>
-  <input type="text" id="multiNumbers" placeholder="23,A12,Rojo pastel...">
-  <button id="saveMultiBtn">Guardar selección</button>
-  <div id="multiSelected" class="multi-selected"></div>
+<div class="floating-input" id="floatingInput">
+  <input type="text" id="colorNumberInput" placeholder="Número o nombre">
+  <div class="floating-color-box" id="colorPreview"></div>
+  <button id="saveColorBtn">Guardar</button>
 </div>
 
 <div class="box">
@@ -79,16 +75,19 @@ const ctx=canvas.getContext("2d");
 const lupaDiv=document.getElementById("lupa");
 const lupaCanvas=document.getElementById("lupaCanvas");
 const lupaCtx=lupaCanvas.getContext("2d");
+
 const collectionSelect=document.getElementById("collectionSelect");
 const newCollectionBtn=document.getElementById("newCollectionBtn");
 const collectionsContainer=document.getElementById("collectionsContainer");
 const paletteContainer=document.getElementById("paletteContainer");
-const saveMultiBtn=document.getElementById("saveMultiBtn");
-const multiNumbersInput=document.getElementById("multiNumbers");
-const multiSelectedDiv=document.getElementById("multiSelected");
+
+const floatingInput=document.getElementById("floatingInput");
+const colorNumberInput=document.getElementById("colorNumberInput");
+const colorPreview=document.getElementById("colorPreview");
+const saveColorBtn=document.getElementById("saveColorBtn");
 
 let currentImage=null, currentCollection=null;
-let multiColors=[];
+let selectedColor=null;
 
 const families=[
   {name:"Rojos", min:345, max:15},
@@ -178,6 +177,21 @@ function hexToHSL(H){
   s=Math.round(s*100); l=Math.round(l*100);
   return {h,s,l};
 }
+function hslToHex(h,s,l){
+  s/=100; l/=100;
+  let c=(1-Math.abs(2*l-1))*s;
+  let x=c*(1-Math.abs((h/60)%2-1));
+  let m=l-c/2;
+  let r=0,g=0,b=0;
+  if(h<60){ r=c; g=x; b=0;}
+  else if(h<120){ r=x; g=c; b=0;}
+  else if(h<180){ r=0; g=c; b=x;}
+  else if(h<240){ r=0; g=x; b=c;}
+  else if(h<300){ r=x; g=0; b=c;}
+  else{ r=c; g=0; b=x;}
+  r=Math.round((r+m)*255); g=Math.round((g+m)*255); b=Math.round((b+m)*255);
+  return rgbToHex(r,g,b);
+}
 function getFamily(h){
   for(let f of families){
     if(f.min>f.max){ if(h>=f.min || h<=f.max) return f.name; }
@@ -186,25 +200,7 @@ function getFamily(h){
   return "Otros";
 }
 
-// ===== Lupa y selección múltiple =====
-function addMultiColor(x,y){
-  if(!currentImage) return;
-  const rect=canvas.getBoundingClientRect();
-  const scaleX=canvas.width/rect.width;
-  const scaleY=canvas.height/rect.height;
-  const clickX=Math.floor((x-rect.left)*scaleX);
-  const clickY=Math.floor((y-rect.top)*scaleY);
-
-  const pixel=ctx.getImageData(clickX,clickY,1,1).data;
-  const hex=rgbToHex(pixel[0],pixel[1],pixel[2]);
-
-  if(multiColors.find(c=>c.hex===hex)) return;
-  multiColors.push({hex});
-  renderMultiSelected();
-  generatePalettes(hex);
-}
-
-// Mostrar lupa
+// ===== Lupa =====
 function moveLupa(x,y){
   if(!currentImage) return;
   lupaDiv.style.display="block";
@@ -226,55 +222,56 @@ function moveLupa(x,y){
   lupaCtx.drawImage(canvas,sx,sy,lw/zoom,lh/zoom,0,0,lw,lh);
 }
 
-canvas.addEventListener("mousedown",(e)=>{ addMultiColor(e.clientX,e.clientY); });
-canvas.addEventListener("mousemove",(e)=>{ if(e.buttons){ moveLupa(e.clientX,e.clientY); addMultiColor(e.clientX,e.clientY); } });
-canvas.addEventListener("mouseup",(e)=>{ moveLupa(e.clientX,e.clientY); lupaDiv.style.display="none"; });
+// ===== Selección de color =====
+function pickColor(x,y){
+  if(!currentImage) return;
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width;
+  const scaleY=canvas.height/rect.height;
+  const clickX=Math.floor((x-rect.left)*scaleX);
+  const clickY=Math.floor((y-rect.top)*scaleY);
+  const pixel=ctx.getImageData(clickX,clickY,1,1).data;
+  const hex=rgbToHex(pixel[0],pixel[1],pixel[2]);
+  selectedColor={hex};
+  colorPreview.style.background=hex;
 
-canvas.addEventListener("touchstart",(e)=>{ e.preventDefault(); const t=e.touches[0]; moveLupa(t.clientX,t.clientY); addMultiColor(t.clientX,t.clientY); });
-canvas.addEventListener("touchmove",(e)=>{ e.preventDefault(); const t=e.touches[0]; moveLupa(t.clientX,t.clientY); addMultiColor(t.clientX,t.clientY); });
-canvas.addEventListener("touchend",(e)=>{ lupaDiv.style.display="none"; });
+  // Mostrar input flotante cerca del clic
+  floatingInput.style.left=(x+10)+"px";
+  floatingInput.style.top=(y+10)+"px";
+  floatingInput.style.display="flex";
+  colorNumberInput.value="";
+  colorNumberInput.focus();
 
-function renderMultiSelected(){
-  multiSelectedDiv.innerHTML="";
-  multiColors.forEach((c,i)=>{
-    const div=document.createElement("div");
-    div.className="multi-color-box";
-    div.style.background=c.hex;
-
-    const delBtn=document.createElement("button");
-    delBtn.textContent="×";
-    delBtn.addEventListener("click",(e)=>{
-      e.stopPropagation();
-      multiColors.splice(i,1);
-      renderMultiSelected();
-    });
-
-    div.appendChild(delBtn);
-    multiSelectedDiv.appendChild(div);
-  });
+  generatePalettes(hex);
 }
 
-// ===== Guardar selección =====
-saveMultiBtn.addEventListener("click",()=>{
-  if(!currentCollection || multiColors.length===0) return alert("Selecciona colores y colección");
-  const numbers=multiNumbersInput.value.split(",").map(s=>s.trim());
-  if(numbers.length!==multiColors.length) return alert("Introduce el mismo número de nombres que colores seleccionados");
+canvas.addEventListener("mousedown",(e)=>{ moveLupa(e.clientX,e.clientY); pickColor(e.clientX,e.clientY); });
+canvas.addEventListener("mousemove",(e)=>{ if(e.buttons){ moveLupa(e.clientX,e.clientY); } });
+canvas.addEventListener("mouseup",(e)=>{ lupaDiv.style.display="none"; });
 
-  multiColors.forEach((c,i)=>{
-    const hsl=hexToHSL(c.hex);
-    const family=getFamily(hsl.h);
-    if(!collections[currentCollection][family]) collections[currentCollection][family]=[];
-    collections[currentCollection][family].push({
-      number:numbers[i],
-      hex:c.hex,
-      h:hsl.h,
-      s:hsl.s,
-      l:hsl.l
-    });
+canvas.addEventListener("touchstart",(e)=>{ e.preventDefault(); const t=e.touches[0]; moveLupa(t.clientX,t.clientY); pickColor(t.clientX,t.clientY); });
+canvas.addEventListener("touchmove",(e)=>{ e.preventDefault(); const t=e.touches[0]; moveLupa(t.clientX,t.clientY); });
+canvas.addEventListener("touchend",(e)=>{ lupaDiv.style.display="none"; });
+
+// ===== Guardar color =====
+saveColorBtn.addEventListener("click",()=>{
+  if(!currentCollection || !selectedColor) return alert("Selecciona un color y colección");
+  const num=colorNumberInput.value.trim();
+  if(!num) return alert("Introduce un número/nombre");
+  const hsl=hexToHSL(selectedColor.hex);
+  const family=getFamily(hsl.h);
+  if(!collections[currentCollection][family]) collections[currentCollection][family]=[];
+  collections[currentCollection][family].push({
+    number:num,
+    hex:selectedColor.hex,
+    h:hsl.h,
+    s:hsl.s,
+    l:hsl.l
   });
   saveCollections();
   renderCollection();
-  multiColors=[]; multiNumbersInput.value=""; renderMultiSelected();
+  floatingInput.style.display="none";
+  selectedColor=null;
 });
 
 // ===== Render colección =====
@@ -360,22 +357,6 @@ function generatePalettes(hex){
     div.style.background=palHex;
     paletteContainer.appendChild(div);
   }
-}
-
-function hslToHex(h,s,l){
-  s/=100; l/=100;
-  let c=(1-Math.abs(2*l-1))*s;
-  let x=c*(1-Math.abs((h/60)%2-1));
-  let m=l-c/2;
-  let r=0,g=0,b=0;
-  if(h<60){ r=c; g=x; b=0;}
-  else if(h<120){ r=x; g=c; b=0;}
-  else if(h<180){ r=0; g=c; b=x;}
-  else if(h<240){ r=0; g=x; b=c;}
-  else if(h<300){ r=x; g=0; b=c;}
-  else{ r=c; g=0; b=x;}
-  r=Math.round((r+m)*255); g=Math.round((g+m)*255); b=Math.round((b+m)*255);
-  return rgbToHex(r,g,b);
 }
 
 updateCollectionSelect();
