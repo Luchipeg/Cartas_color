@@ -9,13 +9,13 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f5f5f5;
+  background: #f2f2f2;
 }
 
 header {
-  padding: 12px;
   background: #111;
-  color: #fff;
+  color: white;
+  padding: 10px;
   text-align: center;
 }
 
@@ -23,33 +23,23 @@ main {
   padding: 10px;
 }
 
-.controls {
-  margin-bottom: 10px;
-}
-
-.controls button {
-  margin-right: 6px;
-  margin-bottom: 6px;
-}
-
-#canvasContainer {
-  position: relative;
-  max-width: 100%;
-}
-
 canvas {
   width: 100%;
-  touch-action: none;
   border-radius: 8px;
+  touch-action: none;
   background: #000;
+}
+
+#canvasWrapper {
+  position: relative;
 }
 
 #loupe {
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
-  border: 3px solid #fff;
+  border: 3px solid white;
   overflow: hidden;
   pointer-events: none;
   display: none;
@@ -61,32 +51,31 @@ canvas {
   height: 100%;
 }
 
-#pickerUI {
+#pickerBox {
   position: absolute;
-  display: none;
-  background: #fff;
+  background: white;
   border-radius: 10px;
   padding: 8px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  width: 160px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  display: none;
   z-index: 11;
-  width: 180px;
 }
 
 #colorPreview {
-  width: 100%;
-  height: 30px;
+  height: 28px;
   border-radius: 6px;
   margin-bottom: 6px;
   border: 1px solid #ccc;
 }
 
-#pickerUI input {
+#pickerBox input {
   width: 100%;
   margin-bottom: 6px;
   padding: 4px;
 }
 
-#pickerUI button {
+#pickerBox button {
   width: 100%;
   padding: 6px;
 }
@@ -96,32 +85,26 @@ canvas {
 <body>
 
 <header>
-  <h1>Chroma Order</h1>
+  <h2>Chroma Order</h2>
 </header>
 
 <main>
+  <input type="file" id="imageInput" accept="image/*"><br><br>
 
-<div class="controls">
-  <input type="file" id="imageInput" accept="image/*">
-  <button onclick="startCalibration('black')">Calibrar negro</button>
-  <button onclick="startCalibration('white')">Calibrar blanco</button>
-</div>
+  <div id="canvasWrapper">
+    <canvas id="imageCanvas"></canvas>
 
-<div id="canvasContainer">
-  <canvas id="imageCanvas"></canvas>
+    <div id="loupe">
+      <canvas id="loupeCanvas" width="100" height="100"></canvas>
+    </div>
 
-  <div id="loupe">
-    <canvas id="loupeCanvas" width="120" height="120"></canvas>
+    <div id="pickerBox">
+      <div id="colorPreview"></div>
+      <input id="colorNumber" placeholder="Número">
+      <input id="colorName" placeholder="Nombre">
+      <button onclick="saveColor()">Guardar</button>
+    </div>
   </div>
-
-  <div id="pickerUI">
-    <div id="colorPreview"></div>
-    <input id="colorNumber" placeholder="Número">
-    <input id="colorName" placeholder="Nombre del color">
-    <button onclick="saveColor()">Guardar</button>
-  </div>
-</div>
-
 </main>
 
 <script>
@@ -132,13 +115,11 @@ const loupe = document.getElementById('loupe');
 const loupeCanvas = document.getElementById('loupeCanvas');
 const loupeCtx = loupeCanvas.getContext('2d');
 
-const pickerUI = document.getElementById('pickerUI');
+const pickerBox = document.getElementById('pickerBox');
 const colorPreview = document.getElementById('colorPreview');
 
 let img = new Image();
-let calibrationMode = null;
-let calibrationOffset = { r: 0, g: 0, b: 0 };
-let lastColor = null;
+let currentColor = null;
 
 document.getElementById('imageInput').addEventListener('change', e => {
   const file = e.target.files[0];
@@ -152,87 +133,63 @@ img.onload = () => {
   ctx.drawImage(img, 0, 0);
 };
 
-function startCalibration(type) {
-  calibrationMode = type;
-  alert('Selecciona el color en la imagen para calibrar');
-}
-
-canvas.addEventListener('pointermove', e => {
+function getCanvasCoords(touch) {
   const rect = canvas.getBoundingClientRect();
-  const x = Math.round((e.clientX - rect.left) * (canvas.width / rect.width));
-  const y = Math.round((e.clientY - rect.top) * (canvas.height / rect.height));
-
-  loupe.style.display = 'block';
-  loupe.style.left = e.clientX - rect.left + 20 + 'px';
-  loupe.style.top = e.clientY - rect.top - 140 + 'px';
-
-  const size = 15;
-  loupeCtx.imageSmoothingEnabled = false;
-  loupeCtx.clearRect(0,0,120,120);
-  loupeCtx.drawImage(canvas, x-size, y-size, size*2, size*2, 0, 0, 120, 120);
-
-  const pixel = ctx.getImageData(x, y, 1, 1).data;
-  lastColor = applyCalibration(pixel);
-});
-
-canvas.addEventListener('pointerdown', e => {
-  if (!lastColor) return;
-
-  if (calibrationMode) {
-    applyCalibrationOffset(lastColor, calibrationMode);
-    calibrationMode = null;
-    alert('Calibración aplicada');
-    return;
-  }
-
-  const rect = canvas.getBoundingClientRect();
-  pickerUI.style.display = 'block';
-  pickerUI.style.left = e.clientX - rect.left + 20 + 'px';
-  pickerUI.style.top = e.clientY - rect.top + 'px';
-
-  colorPreview.style.background = rgbToHex(lastColor);
-});
-
-function applyCalibration(pixel) {
-  return [
-    clamp(pixel[0] + calibrationOffset.r),
-    clamp(pixel[1] + calibrationOffset.g),
-    clamp(pixel[2] + calibrationOffset.b)
-  ];
-}
-
-function applyCalibrationOffset(pixel, type) {
-  const target = type === 'black'
-    ? [0,0,0]
-    : [255,255,255];
-
-  calibrationOffset = {
-    r: target[0] - pixel[0],
-    g: target[1] - pixel[1],
-    b: target[2] - pixel[2]
+  return {
+    x: Math.round((touch.clientX - rect.left) * (canvas.width / rect.width)),
+    y: Math.round((touch.clientY - rect.top) * (canvas.height / rect.height)),
+    screenX: touch.clientX - rect.left,
+    screenY: touch.clientY - rect.top
   };
 }
 
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  handleTouch(e.touches[0]);
+});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  handleTouch(e.touches[0]);
+});
+
+function handleTouch(touch) {
+  const pos = getCanvasCoords(touch);
+  if (pos.x < 0 || pos.y < 0) return;
+
+  const pixel = ctx.getImageData(pos.x, pos.y, 1, 1).data;
+  currentColor = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+
+  // Loupe
+  loupe.style.display = 'block';
+  loupe.style.left = pos.screenX + 20 + 'px';
+  loupe.style.top = pos.screenY - 120 + 'px';
+
+  loupeCtx.imageSmoothingEnabled = false;
+  loupeCtx.clearRect(0,0,100,100);
+  loupeCtx.drawImage(canvas,
+    pos.x - 8, pos.y - 8, 16, 16,
+    0, 0, 100, 100
+  );
+
+  // Picker box
+  pickerBox.style.display = 'block';
+  pickerBox.style.left = pos.screenX + 20 + 'px';
+  pickerBox.style.top = pos.screenY + 'px';
+  colorPreview.style.background = currentColor;
+}
+
 function saveColor() {
-  const num = document.getElementById('colorNumber').value;
+  const number = document.getElementById('colorNumber').value;
   const name = document.getElementById('colorName').value;
 
   console.log({
-    number: num,
-    name: name,
-    rgb: lastColor,
-    hex: rgbToHex(lastColor)
+    number,
+    name,
+    color: currentColor
   });
 
-  pickerUI.style.display = 'none';
-}
-
-function rgbToHex([r,g,b]) {
-  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
-}
-
-function clamp(v) {
-  return Math.max(0, Math.min(255, Math.round(v)));
+  pickerBox.style.display = 'none';
 }
 </script>
 
