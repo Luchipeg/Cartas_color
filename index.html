@@ -12,7 +12,8 @@ canvas{ display:block; width:100%; max-width:700px; border:1px solid #ccc; touch
 .lupa{ position:absolute; width:80px; height:80px; border:2px solid #333; border-radius:50%; overflow:hidden; display:none; pointer-events:none; z-index:1000; }
 .lupa canvas{ position:absolute; width:160px; height:160px; } /* zoom 2x */
 .lupa-dot{ position:absolute; width:4px; height:4px; background:red; border-radius:50%; top:38px; left:38px; pointer-events:none; }
-.lupa-hex{ position:absolute; bottom:0; width:100%; text-align:center; font-size:12px; background:rgba(255,255,255,0.7); }
+.floating-input{ position:absolute; background:#fff; border:1px solid #333; padding:4px; border-radius:4px; display:none; z-index:1001; display:flex; align-items:center; gap:4px;}
+.floating-color-box{ width:24px; height:24px; border:1px solid #000; border-radius:4px; }
 button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 .collection-select{ margin-bottom:8px; }
 .family-title{ font-weight:bold; margin-top:12px; }
@@ -22,7 +23,6 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 .cell-buttons{ display:flex; justify-content:center; gap:2px; margin-top:2px; }
 .cell-buttons button{ padding:2px 4px; font-size:10px; }
 .scrollable{ max-height:400px; overflow-y:auto; border:1px solid #ccc; padding:4px; border-radius:4px; background:#fafafa; }
-.save-btn{ margin-top:4px; }
 </style>
 </head>
 <body>
@@ -43,11 +43,13 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
   <div class="lupa" id="lupa">
     <canvas id="lupaCanvas"></canvas>
     <div class="lupa-dot"></div>
-    <div class="lupa-hex" id="lupaHex"></div>
   </div>
 
-  <button class="save-btn" id="saveColorBtn">Guardar color actual</button>
-  <input type="text" id="colorNumber" placeholder="Número/Nombre" style="width:100px;">
+  <div class="floating-input" id="floatingInput">
+    <div class="floating-color-box" id="floatingColorBox"></div>
+    <input type="text" id="colorNumber" placeholder="Número/Nombre">
+    <button id="saveColorBtn">Guardar</button>
+  </div>
 </div>
 
 <div class="box">
@@ -67,9 +69,10 @@ const ctx=canvas.getContext("2d");
 const lupaDiv=document.getElementById("lupa");
 const lupaCanvas=document.getElementById("lupaCanvas");
 const lupaCtx=lupaCanvas.getContext("2d");
-const lupaHex=document.getElementById("lupaHex");
-const saveColorBtn=document.getElementById("saveColorBtn");
+const floatingInput=document.getElementById("floatingInput");
 const colorNumberInput=document.getElementById("colorNumber");
+const floatingColorBox=document.getElementById("floatingColorBox");
+const saveColorBtn=document.getElementById("saveColorBtn");
 const collectionSelect=document.getElementById("collectionSelect");
 const newCollectionBtn=document.getElementById("newCollectionBtn");
 const collectionsContainer=document.getElementById("collectionsContainer");
@@ -173,8 +176,8 @@ function getFamily(h){
   return "Otros";
 }
 
-// ===== Seguimiento dedo / lupa =====
-function updateLupa(x,y,pageX,pageY){
+// ===== Lupa y floating input =====
+function updateLupaAndInput(x,y,pageX,pageY){
   if(!currentImage) return;
   const rect=canvas.getBoundingClientRect();
   const scaleX=canvas.width/rect.width;
@@ -184,8 +187,8 @@ function updateLupa(x,y,pageX,pageY){
 
   const pixel=ctx.getImageData(clickX,clickY,1,1).data;
   currentColor=rgbToHex(pixel[0],pixel[1],pixel[2]);
-  lupaHex.textContent=currentColor;
 
+  // Lupa
   const lupaSize=80, zoom=2;
   const srcSize=lupaSize/zoom;
   const sx=Math.max(0,clickX-srcSize/2), sy=Math.max(0,clickY-srcSize/2);
@@ -194,13 +197,20 @@ function updateLupa(x,y,pageX,pageY){
   lupaDiv.style.left=(pageX-lupaSize/2)+"px";
   lupaDiv.style.top=(pageY-lupaSize/2)+"px";
   lupaDiv.style.display="block";
+
+  // Floating input con color
+  floatingColorBox.style.background=currentColor;
+  floatingInput.style.left=(pageX+10)+"px";
+  floatingInput.style.top=(pageY-10)+"px";
+  floatingInput.style.display="flex";
+  colorNumberInput.focus();
 }
 
-canvas.addEventListener("touchstart",(e)=>{ e.preventDefault(); const t=e.touches[0]; updateLupa(t.clientX,t.clientY,t.pageX,t.pageY); });
-canvas.addEventListener("touchmove",(e)=>{ e.preventDefault(); const t=e.touches[0]; updateLupa(t.clientX,t.clientY,t.pageX,t.pageY); });
+canvas.addEventListener("touchstart",(e)=>{ e.preventDefault(); const t=e.touches[0]; updateLupaAndInput(t.clientX,t.clientY,t.pageX,t.pageY); });
+canvas.addEventListener("touchmove",(e)=>{ e.preventDefault(); const t=e.touches[0]; updateLupaAndInput(t.clientX,t.clientY,t.pageX,t.pageY); });
 canvas.addEventListener("touchend",(e)=>{ e.preventDefault(); });
 
-// ===== Guardar color actual =====
+// ===== Guardar color =====
 saveColorBtn.addEventListener("click",()=>{
   const number=colorNumberInput.value.trim();
   if(!number || !currentColor || !currentCollection) { alert("Introduce un número y toca un color"); return; }
@@ -212,6 +222,8 @@ saveColorBtn.addEventListener("click",()=>{
   saveCollections();
   renderCollection();
   colorNumberInput.value="";
+  floatingInput.style.display="none";
+  lupaDiv.style.display="none";
 });
 
 // ===== Render colección =====
