@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestor de colores - Preciso</title>
+<title>Gestor de colores preciso</title>
 <style>
 body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin:16px; background:#f5f5f5; }
 h1{ font-size:20px; margin-bottom:12px; }
@@ -28,7 +28,7 @@ button{ padding:6px 10px; margin-right:4px; margin-bottom:4px; }
 </head>
 <body>
 
-<h1>Gestor de colores - Preciso</h1>
+<h1>Gestor de colores preciso</h1>
 
 <div class="box">
   <label>Colección: 
@@ -145,11 +145,11 @@ imageInput.addEventListener("change", ()=>{
   reader.onload=function(e){
     const img=new Image();
     img.onload=function(){
-      const maxWidth=800, maxHeight=600;
-      let w=img.naturalWidth, h=img.naturalHeight;
-      const scale=Math.min(maxWidth/w, maxHeight/h,1);
-      canvas.width=w*scale;
-      canvas.height=h*scale;
+      // Ajustar canvas al tamaño real de la imagen y mantener ratio
+      canvas.width=img.naturalWidth;
+      canvas.height=img.naturalHeight;
+      canvas.style.width=Math.min(img.naturalWidth,700)+"px";
+      canvas.style.height=(img.naturalHeight*(canvas.width/img.naturalWidth))+"px";
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.drawImage(img,0,0,canvas.width,canvas.height);
       currentImage=img;
@@ -226,10 +226,8 @@ function moveLupa(x,y){
 function pickColor(x,y){
   if(!currentImage) return;
   const rect=canvas.getBoundingClientRect();
-  const scaleX=canvas.width/rect.width;
-  const scaleY=canvas.height/rect.height;
-  const clickX=Math.floor((x-rect.left)*scaleX);
-  const clickY=Math.floor((y-rect.top)*scaleY);
+  const clickX=Math.floor((x-rect.left)*(canvas.width/rect.width));
+  const clickY=Math.floor((y-rect.top)*(canvas.height/rect.height));
   const pixel=ctx.getImageData(clickX,clickY,1,1).data;
   const hex=rgbToHex(pixel[0],pixel[1],pixel[2]);
   selectedColor={hex};
