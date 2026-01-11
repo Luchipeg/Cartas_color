@@ -216,9 +216,13 @@ function handleTouch(t) {
   loupeCtx.drawImage(canvas,p.x-8,p.y-8,16,16,0,0,100,100);
 
   pickerBox.style.display='block';
-  pickerBox.style.left=p.sx+15+'px';
-  pickerBox.style.top=p.sy+'px';
+  pickerBox.style.left = p.sx + 15 + 'px';
+  pickerBox.style.top = p.sy + 'px';
   colorPreview.style.background = rgbToHex(currentColor);
+
+  // ✅ Limpiar inputs cada vez que se abre la caja
+  colorNumber.value = '';
+  colorName.value = '';
 }
 
 function saveColor() {
@@ -262,7 +266,7 @@ function sortBy(k){
 
 /* ========= PALETTES ========= */
 function generatePalettes(base){
-  alert('Aquí se generan 5 paletas combinando colores de la colección.\n(Siguiente iteración las mostramos visualmente)');
+  alert('Aquí se generarían 5 paletas combinando colores de la colección.\n(Siguiente iteración las mostramos visualmente)');
 }
 
 /* ========= EXPORT ========= */
