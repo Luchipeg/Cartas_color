@@ -3,129 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chroma Order</title>
-
+<title>Chroma Order Deluxe</title>
 <style>
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f2f2f2;
-}
-
-header {
-  background: #111;
-  color: white;
-  padding: 10px;
-  text-align: center;
-}
-
-main { padding: 10px; }
-
-select, input, button {
-  margin-bottom: 6px;
-  padding: 6px;
-}
-
-canvas {
-  width: 100%;
-  border-radius: 8px;
-  background: #000;
-  touch-action: none;
-}
-
-#canvasWrapper { position: relative; }
-
-#loupe {
-  position: absolute;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  border: 3px solid white;
-  overflow: hidden;
-  pointer-events: none;
-  display: none;
-}
-
-#loupe canvas { width: 100%; height: 100%; }
-
-#pickerBox {
-  position: absolute;
-  background: white;
-  border-radius: 10px;
-  padding: 8px;
-  width: 170px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.25);
-  display: none;
-}
-
-#colorPreview {
-  height: 28px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  border: 1px solid #ccc;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.colorCell {
-  background: white;
-  border-radius: 6px;
-  padding: 4px;
-  text-align: center;
-  font-size: 11px;
-  position: relative;
-}
-
-.colorSwatch {
-  height: 30px;
-  border-radius: 4px;
-}
-
-.removeBtn {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  cursor: pointer;
-  color: red;
-}
+body { margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif; background:#f2f2f2; }
+header { background:#111; color:white; padding:10px; text-align:center; }
+main { padding:10px; }
+select,input,button { margin-bottom:6px; padding:6px; }
+canvas { width:100%; border-radius:8px; background:#000; touch-action:none; }
+#canvasWrapper { position:relative; }
+#loupe { position:absolute; width:100px; height:100px; border-radius:50%; border:3px solid white; overflow:hidden; pointer-events:none; display:none; }
+#loupe canvas { width:100%; height:100%; }
+#pickerBox { position:absolute; background:white; border-radius:10px; padding:8px; width:180px; box-shadow:0 6px 20px rgba(0,0,0,.25); display:none; }
+#colorPreview { height:28px; border-radius:6px; margin-bottom:6px; border:1px solid #ccc; }
+.grid { display:grid; grid-template-columns:repeat(10,1fr); gap:6px; margin-top:10px; }
+.colorCell { background:white; border-radius:6px; padding:4px; text-align:center; font-size:11px; position:relative; }
+.colorSwatch { height:30px; border-radius:4px; }
+.removeBtn { position:absolute; top:2px; right:4px; cursor:pointer; color:red; }
+#calibration { position:sticky; top:0; background:#ddd; padding:6px; z-index:1000; display:flex; gap:6px; }
+.palettes { margin-top:12px; display:flex; gap:12px; flex-wrap:wrap; }
+.palette { border:1px solid #ccc; padding:4px; border-radius:6px; }
+.paletteColor { height:30px; margin-bottom:2px; border-radius:4px; font-size:11px; text-align:center; color:#111; }
 </style>
 </head>
-
 <body>
-
 <header>
-  <h2>Chroma Order</h2>
+<h2>Chroma Order Deluxe</h2>
 </header>
 
-<main>
+<div id="calibration">
+<button id="btnBlack">Calibrar negro</button>
+<button id="btnWhite">Calibrar blanco</button>
+</div>
 
+<main>
 <select id="collectionSelect"></select>
 <button onclick="addCollection()">+ Colección</button><br>
 
 <input type="file" id="imageInput" accept="image/*"><br><br>
 
-<!-- Botones de calibración -->
-<button onclick="calibrateBlack()">Calibrar negro</button>
-<button onclick="calibrateWhite()">Calibrar blanco</button><br><br>
-
 <div id="canvasWrapper">
-  <canvas id="imageCanvas"></canvas>
+<canvas id="imageCanvas"></canvas>
 
-  <div id="loupe">
-    <canvas id="loupeCanvas" width="100" height="100"></canvas>
-  </div>
+<div id="loupe">
+<canvas id="loupeCanvas" width="100" height="100"></canvas>
+</div>
 
-  <div id="pickerBox">
-    <div id="colorPreview"></div>
-    <input id="colorNumber" placeholder="Número">
-    <input id="colorName" placeholder="Nombre">
-    <button onclick="saveColor()">Guardar</button>
-  </div>
+<div id="pickerBox">
+<div id="colorPreview"></div>
+<input id="colorNumber" placeholder="Número">
+<input id="colorName" placeholder="Nombre">
+<button onclick="saveColor()">Guardar</button>
+</div>
 </div>
 
 <br>
@@ -136,174 +64,157 @@ canvas {
 
 <div class="grid" id="colorGrid"></div>
 
+<h3>Paletas</h3>
+<div class="palettes" id="palettes"></div>
 </main>
 
 <script>
-/* ========= DATA ========= */
 let data = JSON.parse(localStorage.getItem('chromaData')) || {};
 let currentCollection = null;
 
-/* ========= COLLECTIONS ========= */
-function refreshCollections() {
+function refreshCollections(){
   const sel = document.getElementById('collectionSelect');
-  sel.innerHTML = '';
-  Object.keys(data).forEach(name => {
-    const o = document.createElement('option');
-    o.value = name; o.textContent = name;
+  sel.innerHTML='';
+  Object.keys(data).forEach(name=>{
+    const o=document.createElement('option');
+    o.value=name; o.textContent=name;
     sel.appendChild(o);
   });
-  sel.onchange = () => {
-    currentCollection = sel.value;
-    renderGrid();
-  };
-  if (!currentCollection && sel.options.length) {
-    currentCollection = sel.options[0].value;
-  }
-  sel.value = currentCollection;
+  sel.onchange=()=>{currentCollection=sel.value; renderGrid();};
+  if(!currentCollection && sel.options.length) currentCollection=sel.options[0].value;
+  sel.value=currentCollection;
 }
-
-function addCollection() {
-  const name = prompt('Nombre de la colección');
-  if (!name) return;
-  data[name] = [];
-  currentCollection = name;
+function addCollection(){
+  const name=prompt('Nombre de la colección');
+  if(!name) return;
+  data[name]=[];
+  currentCollection=name;
   saveData();
   refreshCollections();
 }
 
-/* ========= CANVAS ========= */
-const canvas = document.getElementById('imageCanvas');
-const ctx = canvas.getContext('2d');
-const loupe = document.getElementById('loupe');
-const loupeCanvas = document.getElementById('loupeCanvas');
-const loupeCtx = loupeCanvas.getContext('2d');
-const pickerBox = document.getElementById('pickerBox');
-const colorPreview = document.getElementById('colorPreview');
+/* ========== CANVAS ========== */
+const canvas=document.getElementById('imageCanvas');
+const ctx=canvas.getContext('2d');
+const loupe=document.getElementById('loupe');
+const loupeCanvas=document.getElementById('loupeCanvas');
+const loupeCtx=loupeCanvas.getContext('2d');
+const pickerBox=document.getElementById('pickerBox');
+const colorPreview=document.getElementById('colorPreview');
+const colorNumber=document.getElementById('colorNumber');
+const colorName=document.getElementById('colorName');
 
-let img = new Image();
-let currentColor = null;
-let blackPoint = null;
-let whitePoint = null;
+let img=new Image();
+let currentColor=null;
+let blackPoint=null;
+let whitePoint=null;
 
-document.getElementById('imageInput').onchange = e => {
-  img.src = URL.createObjectURL(e.target.files[0]);
+document.getElementById('imageInput').onchange=e=>{
+  img.src=URL.createObjectURL(e.target.files[0]);
 };
 
-img.onload = () => {
-  canvas.width = img.width;
-  canvas.height = img.height;
+img.onload=()=>{
+  canvas.width=img.width;
+  canvas.height=img.height;
   ctx.drawImage(img,0,0);
-  // Reset calibración al cargar nueva imagen
-  blackPoint = null;
-  whitePoint = null;
+  blackPoint=null;
+  whitePoint=null;
 };
 
-/* Calibración */
-function calibrateBlack() {
+/* ========== CALIBRATION ========== */
+document.getElementById('btnBlack').addEventListener('touchstart',e=>{
   alert('Toca en la imagen el punto negro de referencia');
-  canvas.addEventListener('click', pickBlack, { once: true });
-}
-function calibrateWhite() {
+  canvas.addEventListener('touchstart',pickBlack,{once:true});
+});
+document.getElementById('btnWhite').addEventListener('touchstart',e=>{
   alert('Toca en la imagen el punto blanco de referencia');
-  canvas.addEventListener('click', pickWhite, { once: true });
-}
-function pickBlack(e) {
-  const pos = getPos(e);
-  const px = ctx.getImageData(pos.x,pos.y,1,1).data;
-  blackPoint = { r:px[0], g:px[1], b:px[2] };
+  canvas.addEventListener('touchstart',pickWhite,{once:true});
+});
+function pickBlack(e){
+  const t=e.touches?e.touches[0]:e;
+  const p=getPos(t);
+  const px=ctx.getImageData(p.x,p.y,1,1).data;
+  blackPoint={r:px[0],g:px[1],b:px[2]};
   alert('Negro calibrado');
 }
-function pickWhite(e) {
-  const pos = getPos(e);
-  const px = ctx.getImageData(pos.x,pos.y,1,1).data;
-  whitePoint = { r:px[0], g:px[1], b:px[2] };
+function pickWhite(e){
+  const t=e.touches?e.touches[0]:e;
+  const p=getPos(t);
+  const px=ctx.getImageData(p.x,p.y,1,1).data;
+  whitePoint={r:px[0],g:px[1],b:px[2]};
   alert('Blanco calibrado');
 }
 
-/* ========= TOUCH ========= */
-function getPos(t) {
-  const r = canvas.getBoundingClientRect();
-  return {
-    x: Math.round((t.clientX - r.left) * (canvas.width / r.width)),
-    y: Math.round((t.clientY - r.top) * (canvas.height / r.height)),
-    sx: t.clientX - r.left,
-    sy: t.clientY - r.top
-  };
+/* ========== TOUCH ========== */
+function getPos(t){
+  const r=canvas.getBoundingClientRect();
+  return {x:Math.round((t.clientX-r.left)*(canvas.width/r.width)),
+          y:Math.round((t.clientY-r.top)*(canvas.height/r.height)),
+          sx:t.clientX-r.left, sy:t.clientY-r.top};
 }
 
-canvas.addEventListener('touchstart', e => handleTouch(e.touches[0]));
-canvas.addEventListener('touchmove', e => handleTouch(e.touches[0]));
+canvas.addEventListener('touchstart',e=>handleTouch(e.touches[0]));
+canvas.addEventListener('touchmove',e=>handleTouch(e.touches[0]));
 
-function handleTouch(t) {
-  const p = getPos(t);
-  let px = ctx.getImageData(p.x,p.y,1,1).data;
-  currentColor = { r:px[0], g:px[1], b:px[2] };
+function handleTouch(t){
+  const p=getPos(t);
+  let px=ctx.getImageData(p.x,p.y,1,1).data;
+  currentColor={r:px[0],g:px[1],b:px[2]};
 
-  // Aplicar calibración si existe
-  if(blackPoint && whitePoint){
-    currentColor = applyCalibration(currentColor);
-  }
+  if(blackPoint && whitePoint) currentColor=applyCalibration(currentColor);
 
-  loupe.style.display = 'block';
-  loupe.style.left = p.sx+15+'px';
-  loupe.style.top = p.sy-110+'px';
-
+  loupe.style.display='block';
+  loupe.style.left=p.sx+15+'px';
+  loupe.style.top=p.sy-110+'px';
   loupeCtx.imageSmoothingEnabled=false;
   loupeCtx.clearRect(0,0,100,100);
   loupeCtx.drawImage(canvas,p.x-8,p.y-8,16,16,0,0,100,100);
 
   pickerBox.style.display='block';
-  pickerBox.style.left = p.sx + 15 + 'px';
-  pickerBox.style.top = p.sy + 'px';
-  colorPreview.style.background = rgbToHex(currentColor);
-
-  // Limpiar inputs al tocar nuevo color
-  colorNumber.value = '';
-  colorName.value = '';
+  pickerBox.style.left=p.sx+15+'px';
+  pickerBox.style.top=p.sy+'px';
+  colorPreview.style.background=rgbToHex(currentColor);
+  colorNumber.value='';
+  colorName.value='';
 }
 
-/* ========= CALIBRATION FUNCTION ========= */
 function applyCalibration(c){
-  const scale = {
-    r: 255/(whitePoint.r - blackPoint.r || 1),
-    g: 255/(whitePoint.g - blackPoint.g || 1),
-    b: 255/(whitePoint.b - blackPoint.b || 1)
-  };
-  return {
-    r: clamp((c.r - blackPoint.r) * scale.r),
-    g: clamp((c.g - blackPoint.g) * scale.g),
-    b: clamp((c.b - blackPoint.b) * scale.b)
-  };
+  const scale={r:255/(whitePoint.r-blackPoint.r||1),
+               g:255/(whitePoint.g-blackPoint.g||1),
+               b:255/(whitePoint.b-blackPoint.b||1)};
+  return {r:clamp((c.r-blackPoint.r)*scale.r),
+          g:clamp((c.g-blackPoint.g)*scale.g),
+          b:clamp((c.b-blackPoint.b)*scale.b)};
 }
-function clamp(v){ return Math.min(255, Math.max(0, Math.round(v))); }
+function clamp(v){return Math.min(255,Math.max(0,Math.round(v)));}
 
-/* ========= SAVE COLOR ========= */
-function saveColor() {
-  if (!currentCollection) return alert('Crea una colección');
-  const n = colorNumber.value;
-  const name = colorName.value;
-  const hsl = rgbToHsl(currentColor);
-  data[currentCollection].push({ n, name, ...currentColor, ...hsl });
+/* ========== SAVE COLOR ========== */
+function saveColor(){
+  if(!currentCollection) return alert('Crea una colección');
+  const n=colorNumber.value.trim();
+  const name=colorName.value.trim();
+  if(!n) return alert('Introduce número del color');
+  const hsl=rgbToHsl(currentColor);
+  data[currentCollection].push({n,name,...currentColor,...hsl});
   saveData();
   renderGrid();
   pickerBox.style.display='none';
 }
 
-/* ========= GRID ========= */
-function renderGrid() {
-  const g = document.getElementById('colorGrid');
+/* ========== GRID ========== */
+function renderGrid(){
+  const g=document.getElementById('colorGrid');
   g.innerHTML='';
   (data[currentCollection]||[]).forEach((c,i)=>{
     const d=document.createElement('div');
     d.className='colorCell';
-    d.innerHTML=`
-      <div class="removeBtn" onclick="removeColor(${i})">×</div>
-      <div class="colorSwatch" style="background:${rgbToHex(c)}"></div>
-      ${c.n}<br>${c.name}
-    `;
+    d.innerHTML=`<div class="removeBtn" onclick="removeColor(${i})">×</div>
+                  <div class="colorSwatch" style="background:${rgbToHex(c)}"></div>
+                  ${c.n}<br>${c.name}<br>${rgbToHex(c)}`;
     d.onclick=()=>generatePalettes(c);
     g.appendChild(d);
   });
+  renderPalettes([]);
 }
 
 function removeColor(i){
@@ -311,30 +222,67 @@ function removeColor(i){
   saveData(); renderGrid();
 }
 
-/* ========= SORT ========= */
+/* ========== SORT ========== */
 function sortBy(k){
   data[currentCollection].sort((a,b)=>a[k]-b[k]);
   saveData(); renderGrid();
 }
 
-/* ========= PALETTES ========= */
+/* ========== PALETTES ARMÓNICAS ========== */
 function generatePalettes(base){
-  alert('Aquí se generarían 5 paletas combinando colores de la colección.\n(Siguiente iteración las mostramos visualmente)');
+  const palettesDiv=document.getElementById('palettes');
+  palettesDiv.innerHTML='';
+  const collection=data[currentCollection];
+
+  function hueDistance(h1,h2){ let d=Math.abs(h1-h2); return d>180?360-d:d; }
+
+  const sortedByHue = collection.slice().sort((a,b)=>a.h-b.h);
+
+  for(let p=0;p<5;p++){
+    const palette=document.createElement('div');
+    palette.className='palette';
+    let palColors=[];
+
+    switch(p){
+      case 0: // Análogos ±30°
+        palColors=sortedByHue.filter(c=>hueDistance(c.h,base.h)<=30 && c!==base).slice(0,4);
+        break;
+      case 1: // Complementario ±30° de 180°
+        palColors=sortedByHue.filter(c=>hueDistance(c.h,(base.h+180)%360)<=30 && c!==base).slice(0,4);
+        break;
+      case 2: // Triada ±10° de ±120°
+        palColors=sortedByHue.filter(c=>[ (base.h+120)%360,(base.h+240)%360 ].some(t=>hueDistance(c.h,t)<=10)).slice(0,4);
+        break;
+      case 3: // Monocromática ±10° h
+        palColors=sortedByHue.filter(c=>hueDistance(c.h,base.h)<=10 && c!==base).slice(0,4);
+        break;
+      case 4: // Libre ±60°
+        palColors=sortedByHue.filter(c=>hueDistance(c.h,base.h)<=60 && c!==base).slice(0,4);
+        break;
+    }
+
+    if(palColors.length<4) palColors=palColors.concat(sortedByHue.filter(c=>c!==base).slice(0,4-palColors.length));
+
+    palColors.forEach(c=>{
+      const cDiv=document.createElement('div');
+      cDiv.className='paletteColor';
+      cDiv.style.background=rgbToHex(c);
+      cDiv.textContent=`${c.n} - ${c.name} - ${rgbToHex(c)}`;
+      palette.appendChild(cDiv);
+    });
+    palettesDiv.appendChild(palette);
+  }
 }
 
-/* ========= EXPORT ========= */
+/* ========== EXPORT ========== */
 function exportNumbers(){
   const txt=data[currentCollection].map(c=>c.n).join(', ');
   alert(txt);
 }
 
-/* ========= UTILS ========= */
-function saveData(){
-  localStorage.setItem('chromaData',JSON.stringify(data));
-}
-function rgbToHex(c){
-  return '#'+[c.r,c.g,c.b].map(v=>v.toString(16).padStart(2,'0')).join('');
-}
+/* ========== UTILS ========== */
+function saveData(){ localStorage.setItem('chromaData',JSON.stringify(data)); }
+function rgbToHex(c){ return '#'+[c.r,c.g,c.b].map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function rgbToHsl({r,g,b}){
   r/=255; g/=255; b/=255;
   const max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -343,11 +291,7 @@ function rgbToHsl({r,g,b}){
   else{
     const d=max-min;
     s=l>0.5?d/(2-max-min):d/(max+min);
-    switch(max){
-      case r:h=(g-b)/d+(g<b?6:0);break;
-      case g:h=(b-r)/d+2;break;
-      case b:h=(r-g)/d+4;break;
-    }
+    switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}
     h/=6;
   }
   return {h:h*360,s:s*100,l:l*100};
@@ -357,6 +301,5 @@ function rgbToHsl({r,g,b}){
 refreshCollections();
 renderGrid();
 </script>
-
 </body>
 </html>
