@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Color Collector Base</title>
+<title>Color Collector Base Estable</title>
 <style>
-body { font-family: sans-serif; margin:0; padding:0; display:flex; flex-direction:column; align-items:center;}
+body { font-family: sans-serif; margin:0; padding:10px; display:flex; flex-direction:column; align-items:center;}
 h3 { margin:10px;}
 #canvasContainer { position: relative; margin:10px; touch-action:none; }
 canvas { border:1px solid #333; max-width:95vw; height:auto; display:block; }
@@ -14,29 +14,24 @@ canvas { border:1px solid #333; max-width:95vw; height:auto; display:block; }
 #controls { margin:10px; }
 #colorTable { border-collapse: collapse; margin:10px; width:95%; max-width:800px;}
 #colorTable th, #colorTable td { border:1px solid #ccc; padding:4px; text-align:center; }
-.orderBtn { margin-right:5px; }
+#saveColor { margin-left:10px; }
 </style>
 </head>
 <body>
-<h3>Color Collector Base</h3>
+<h3>Color Collector Base Estable</h3>
+
 <div id="canvasContainer">
 <input type="file" id="imageLoader" accept="image/png, image/jpeg">
 <canvas id="colorCanvas"></canvas>
-<div style="display:inline-block;">
+</div>
+
+<div>
 <input type="text" id="colorInput" placeholder="Número/Nombre">
 <div id="colorPreview"></div>
 <button id="saveColor">Guardar color</button>
 </div>
-</div>
 
 <div id="controls">
-Ordenar por:
-<button class="orderBtn" data-sort="hue">Matiz</button>
-<button class="orderBtn" data-sort="saturation">Saturación</button>
-<button class="orderBtn" data-sort="lightness">Luminosidad</button>
-<button class="orderBtn" data-sort="hueLight">Matiz + Claro→Oscuro</button>
-<button class="orderBtn" data-sort="hueSat">Matiz + Saturación</button>
-<button class="orderBtn" data-sort="satLight">Saturación + Luminosidad</button>
 <button id="exportNames">Exportar nombres/números</button>
 <button id="exportHex">Exportar nombres/números + HEX</button>
 </div>
@@ -79,7 +74,7 @@ canvas.addEventListener('click', function(e){
     let rect = canvas.getBoundingClientRect();
     let x = Math.floor(e.clientX - rect.left);
     let y = Math.floor(e.clientY - rect.top);
-    // obtener promedio 2x2 píxeles
+    // Promedio 2x2 píxeles para precisión
     let px = ctx.getImageData(x,y,2,2).data;
     let r = Math.round((px[0]+px[4]+px[8]+px[12])/4);
     let g = Math.round((px[1]+px[5]+px[9]+px[13])/4);
@@ -92,9 +87,9 @@ canvas.addEventListener('click', function(e){
 saveColorBtn.addEventListener('click', function(){
     if(!colorInput.value) return alert("Introduce nombre/número");
     let hex = colorInput.dataset.hex;
+    if(!hex) return alert("Selecciona un color en la imagen primero");
     let name = colorInput.value;
-    let hsl = hexToHSL(hex);
-    colors.push({name, hex, hsl});
+    colors.push({name, hex});
     updateTable();
     colorInput.value = '';
 });
@@ -115,56 +110,14 @@ function rgbToHex(r,g,b){
     return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 
-function hexToHSL(H) {
-    let r=parseInt(H.substring(1,3),16)/255;
-    let g=parseInt(H.substring(3,5),16)/255;
-    let b=parseInt(H.substring(5,7),16)/255;
-    let max=Math.max(r,g,b), min=Math.min(r,g,b);
-    let h,s,l=(max+min)/2;
-
-    if(max==min){h=s=0;}
-    else{
-        let d=max-min;
-        s=l>0.5? d/(2-max-min): d/(max+min);
-        switch(max){
-            case r: h=(g-b)/d + (g<b?6:0); break;
-            case g: h=(b-r)/d + 2; break;
-            case b: h=(r-g)/d +4; break;
-        }
-        h/=6;
-    }
-    return {h:h*360,s:s,l:l};
-}
-
-document.querySelectorAll('.orderBtn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-        let sortType = btn.dataset.sort;
-        colors.sort((a,b)=>{
-            switch(sortType){
-                case 'hue': return a.hsl.h - b.hsl.h;
-                case 'saturation': return a.hsl.s - b.hsl.s;
-                case 'lightness': return a.hsl.l - b.hsl.l;
-                case 'hueLight': 
-                    if(a.hsl.h==b.hsl.h) return a.hsl.l - b.hsl.l;
-                    else return a.hsl.h - b.hsl.h;
-                case 'hueSat':
-                    if(a.hsl.h==b.hsl.h) return a.hsl.s - b.hsl.s;
-                    else return a.hsl.h - b.hsl.h;
-                case 'satLight':
-                    if(a.hsl.s==b.hsl.s) return a.hsl.l - b.hsl.l;
-                    else return a.hsl.s - b.hsl.s;
-            }
-        });
-        updateTable();
-    });
-});
-
 document.getElementById('exportNames').addEventListener('click',()=>{
+    if(colors.length===0) return alert("No hay colores guardados");
     let text = colors.map(c=>c.name).join('\n');
     downloadText(text,'colors_names.txt');
 });
 
 document.getElementById('exportHex').addEventListener('click',()=>{
+    if(colors.length===0) return alert("No hay colores guardados");
     let text = colors.map(c=>c.name + ' - ' + c.hex).join('\n');
     downloadText(text,'colors_names_hex.txt');
 });
