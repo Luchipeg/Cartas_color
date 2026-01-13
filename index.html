@@ -3,76 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cartas de Color Deluxe</title>
+<title>Gestor de Colores</title>
 <style>
-  body { font-family: sans-serif; margin: 10px; background:#fdfdfd; }
-  #canvasContainer { position: relative; margin-bottom:10px; }
-  canvas { border:1px solid #ccc; display:block; margin: auto; }
-  #controls { margin: 10px 0; display: flex; gap: 10px; flex-wrap: wrap; }
-  #collections { margin-bottom: 10px; }
-  .collection-btn { padding:5px 10px; border:1px solid #ccc; cursor:pointer; background:#fff; }
-  #palettes { display:flex; flex-wrap: wrap; gap:10px; margin-top:10px; }
-  .palette { border:1px solid #ccc; padding:5px; display:flex; flex-wrap: wrap; gap:3px; }
-  .colorBox { width:20px; height:20px; border:1px solid #000; }
-  #exportOptions { margin-top:10px; }
-  table { width:100%; border-collapse: collapse; margin-top:10px; }
-  th, td { border:1px solid #ccc; padding:5px; text-align:center; }
-  .colorPreview { width:20px; height:20px; display:inline-block; border:1px solid #000; }
+  body { font-family: sans-serif; margin: 10px; }
+  #canvasContainer { position: relative; display: inline-block; border: 1px solid #ccc; }
+  canvas { max-width: 100%; height: auto; display: block; }
+  #colorBox { width: 30px; height: 30px; display: inline-block; vertical-align: middle; margin-left: 10px; border: 1px solid #000; }
+  #colorNameInput { width: 100px; }
+  #controls { margin-top: 10px; }
+  table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+  .palette { display: flex; margin-top: 5px; }
+  .palette div { width: 40px; height: 40px; margin-right: 2px; border: 1px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #000; }
 </style>
 </head>
 <body>
 
-<h2>Cartas de Color Deluxe</h2>
+<h2>Gestor de Colores</h2>
 
+<input type="file" id="imageLoader" accept="image/png, image/jpeg"><br>
 <div id="canvasContainer">
-  <input type="file" id="imageLoader" accept="image/png, image/jpeg">
-  <canvas id="colorCanvas"></canvas>
+  <canvas id="imageCanvas"></canvas>
 </div>
 
-<div id="controls">
-  <button onclick="calibrate('black')">Calibrar Negro</button>
-  <button onclick="calibrate('white')">Calibrar Blanco</button>
-  <button onclick="sortTable('h')">Ordenar por Matiz</button>
-  <button onclick="sortTable('s')">Ordenar por Saturación</button>
-  <button onclick="sortTable('l')">Ordenar por Luminosidad</button>
-  <button onclick="sortTable('hl')">Matiz + Claro-Oscuro</button>
-  <button onclick="sortTable('sl')">Saturación + Luminosidad</button>
+<div id="colorInfo">
+  <input type="text" id="colorNameInput" placeholder="Número/Nombre">
+  <div id="colorBox"></div>
+  <button id="saveColor">Guardar color</button>
 </div>
 
 <div id="collections">
-  <label>Colección: <input type="text" id="collectionName" placeholder="Nombre de la colección"></label>
-  <button onclick="addCollection()">Añadir Colección</button>
-  <select id="collectionSelector" onchange="loadCollectionColors()"></select>
+  <input type="text" id="collectionName" placeholder="Nombre colección">
+  <button id="createCollection">Crear colección</button>
+  <select id="collectionSelect"></select>
 </div>
 
-<div id="palettes"></div>
-
-<div id="exportOptions">
-  <button onclick="exportColors('name')">Exportar Número/Nombre</button>
-  <button onclick="exportColors('nameHex')">Exportar Número/Nombre + HEX</button>
+<div id="sorting">
+  <button data-sort="h">Matiz</button>
+  <button data-sort="hs">Matiz + Claro-Oscuro</button>
+  <button data-sort="s">Saturación</button>
+  <button data-sort="l">Luminosidad</button>
 </div>
 
-<table id="colorTable">
+<div id="export">
+  <button id="exportNames">Exportar Número/Nombre</button>
+  <button id="exportHex">Exportar Número/Nombre + HEX</button>
+</div>
+
+<table id="colorsTable">
   <thead>
-    <tr><th>Número</th><th>HEX</th><th>Color</th></tr>
+    <tr>
+      <th>Colección</th>
+      <th>Número/Nombre</th>
+      <th>HEX</th>
+      <th>Color</th>
+    </tr>
   </thead>
   <tbody></tbody>
 </table>
 
+<div id="palettes"></div>
+
 <script>
-let canvas = document.getElementById('colorCanvas');
+let canvas = document.getElementById('imageCanvas');
 let ctx = canvas.getContext('2d');
 let img = new Image();
-let currentCollection = '';
-let collections = {};
+let currentColor = '#ffffff';
 let colors = [];
+let collections = {};
+let currentCollection = '';
 
-const maxPixelSample = 4; // máximo 4 píxeles para color real
-
-document.getElementById('imageLoader').addEventListener('change', handleImage, false);
-
-function handleImage(e){
-  const reader = new FileReader();
+document.getElementById('imageLoader').addEventListener('change', function(e){
+  let reader = new FileReader();
   reader.onload = function(event){
     img.onload = function(){
       canvas.width = img.width;
@@ -82,132 +84,136 @@ function handleImage(e){
     img.src = event.target.result;
   }
   reader.readAsDataURL(e.target.files[0]);
-}
-
-canvas.addEventListener('click', function(e){
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor(e.clientX - rect.left);
-  const y = Math.floor(e.clientY - rect.top);
-  
-  // recoger color promedio de maxPixelSample píxeles
-  let px = ctx.getImageData(x, y, 1, 1).data;
-  let r = px[0], g = px[1], b = px[2];
-  let hex = rgbToHex(r,g,b);
-  
-  addColorToCollection({number:'', hex, hsl:rgbToHSL(r,g,b)});
 });
 
-function addColorToCollection(color){
-  if(!currentCollection) return alert('Selecciona una colección primero');
-  collections[currentCollection] = collections[currentCollection] || [];
-  collections[currentCollection].push(color);
-  colors.push(color);
+canvas.addEventListener('click', function(e){
+  let rect = canvas.getBoundingClientRect();
+  let x = Math.floor(e.clientX - rect.left);
+  let y = Math.floor(e.clientY - rect.top);
+  // solo promedia 4 píxeles
+  let imageData = ctx.getImageData(x, y, 2, 2).data;
+  let r = Math.round((imageData[0]+imageData[4]+imageData[8]+imageData[12])/4);
+  let g = Math.round((imageData[1]+imageData[5]+imageData[9]+imageData[13])/4);
+  let b = Math.round((imageData[2]+imageData[6]+imageData[10]+imageData[14])/4);
+  currentColor = rgbToHex(r,g,b);
+  document.getElementById('colorBox').style.backgroundColor = currentColor;
+});
+
+document.getElementById('saveColor').addEventListener('click', function(){
+  let name = document.getElementById('colorNameInput').value.trim();
+  if(!name || !currentCollection) { alert('Introduce nombre y selecciona colección'); return; }
+  let hsl = hexToHSL(currentColor);
+  let entry = {collection: currentCollection, name, hex: currentColor, ...hsl};
+  colors.push(entry);
   updateTable();
-  updatePalettes();
+  generatePalettes(currentCollection);
+});
+
+document.getElementById('createCollection').addEventListener('click', function(){
+  let cname = document.getElementById('collectionName').value.trim();
+  if(!cname) return;
+  if(!collections[cname]) collections[cname] = [];
+  currentCollection = cname;
+  updateCollectionSelect();
+});
+
+document.getElementById('collectionSelect').addEventListener('change', function(){
+  currentCollection = this.value;
+  generatePalettes(currentCollection);
+});
+
+document.querySelectorAll('#sorting button').forEach(btn=>{
+  btn.addEventListener('click', function(){
+    let type = this.dataset.sort;
+    sortColors(type);
+    updateTable();
+  });
+});
+
+document.getElementById('exportNames').addEventListener('click', function(){
+  exportColors(false);
+});
+document.getElementById('exportHex').addEventListener('click', function(){
+  exportColors(true);
+});
+
+function updateCollectionSelect(){
+  let sel = document.getElementById('collectionSelect');
+  sel.innerHTML = '';
+  for(let c in collections){
+    let opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  }
+  sel.value = currentCollection;
 }
 
 function updateTable(){
-  const tbody = document.querySelector('#colorTable tbody');
+  let tbody = document.querySelector('#colorsTable tbody');
   tbody.innerHTML = '';
-  colors.forEach(c=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.number||''}</td><td>${c.hex}</td><td><div class="colorPreview" style="background:${c.hex}"></div></td>`;
+  colors.filter(c=>c.collection===currentCollection).forEach(c=>{
+    let tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.collection}</td><td>${c.name}</td><td>${c.hex}</td><td style="background:${c.hex}"></td>`;
     tbody.appendChild(tr);
   });
 }
 
-function updatePalettes(){
-  const container = document.getElementById('palettes');
+function generatePalettes(collection){
+  let container = document.getElementById('palettes');
   container.innerHTML = '';
-  colors.forEach(c=>{
-    const pal = document.createElement('div');
-    pal.className='palette';
-    // 4-5 colores aleatorios de la colección
-    const colArray = collections[currentCollection].slice(0,5);
-    colArray.forEach(cc=>{
-      const box = document.createElement('div');
-      box.className='colorBox';
-      box.style.background=cc.hex;
-      pal.appendChild(box);
-    });
-    container.appendChild(pal);
+  let col = colors.filter(c=>c.collection===collection);
+  col.forEach(c=>{
+    let div = document.createElement('div');
+    div.className = 'palette';
+    for(let i=0;i<5;i++){
+      let p = document.createElement('div');
+      let colorIndex = (col.indexOf(c)+i)%col.length;
+      p.style.background = col[colorIndex].hex;
+      p.textContent = col[colorIndex].name;
+      div.appendChild(p);
+    }
+    container.appendChild(div);
   });
 }
 
-function addCollection(){
-  const name = document.getElementById('collectionName').value.trim();
-  if(!name) return;
-  collections[name]=[];
-  const sel = document.getElementById('collectionSelector');
-  const opt = document.createElement('option');
-  opt.value = name; opt.text=name;
-  sel.appendChild(opt);
-  currentCollection=name;
-  sel.value=name;
-}
-
-function loadCollectionColors(){
-  currentCollection=document.getElementById('collectionSelector').value;
-  colors = collections[currentCollection] || [];
-  updateTable();
-  updatePalettes();
-}
-
-// Ordenamientos
-function sortTable(type){
-  if(!colors.length) return;
-  switch(type){
-    case 'h': colors.sort((a,b)=>a.hsl.h-b.hsl.h); break;
-    case 's': colors.sort((a,b)=>a.hsl.s-b.hsl.s); break;
-    case 'l': colors.sort((a,b)=>a.hsl.l-b.hsl.l); break;
-    case 'hl': colors.sort((a,b)=>{
-      if(a.hsl.h!==b.hsl.h) return a.hsl.h-b.hsl.h;
-      return a.hsl.l-b.hsl.l;
-    }); break;
-    case 'sl': colors.sort((a,b)=>{
-      if(a.hsl.s!==b.hsl.s) return a.hsl.s-b.hsl.s;
-      return a.hsl.l-b.hsl.l;
-    }); break;
-  }
-  updateTable();
-}
-
-function exportColors(mode){
-  let text='';
-  colors.forEach(c=>{
-    if(mode==='name') text+=`${c.number||''}\n`;
-    else text+=`${c.number||''} - ${c.hex}\n`;
-  });
-  const blob = new Blob([text], {type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='colors.txt';
-  a.click();
-}
-
-function calibrate(color){
-  alert('Calibración: '+color);
-}
-
-// Helpers
-function rgbToHex(r,g,b){
-  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-}
-function rgbToHSL(r,g,b){
-  r/=255; g/=255; b/=255;
-  let max=Math.max(r,g,b), min=Math.min(r,g,b);
-  let h=0,s=0,l=(max+min)/2;
-  if(max!==min){
+// helpers
+function rgbToHex(r,g,b){return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');}
+function hexToHSL(H){
+  let r=parseInt(H.substr(1,2),16)/255;
+  let g=parseInt(H.substr(3,2),16)/255;
+  let b=parseInt(H.substr(5,2),16)/255;
+  let max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max==min){h=s=0;}else{
     let d=max-min;
     s=l>0.5?d/(2-max-min):d/(max+min);
-    switch(max){
-      case r: h=(g-b)/d + (g<b?6:0); break;
-      case g: h=(b-r)/d +2; break;
-      case b: h=(r-g)/d +4; break;
-    }
-    h/=6;
+    switch(max){case r: h=(g-b)/d + (g<b?6:0); break; case g: h=(b-r)/d +2; break; case b: h=(r-g)/d +4; break;}
+    h=Math.round(h*360);
+    s=Math.round(s*100);
+    l=Math.round(l*100);
   }
-  return {h: h*360, s: s*100, l: l*100};
+  return {h,s,l};
+}
+
+function sortColors(type){
+  let arr = colors.filter(c=>c.collection===currentCollection);
+  switch(type){
+    case 'h': arr.sort((a,b)=>a.h-b.h); break;
+    case 'hs': arr.sort((a,b)=>a.h-b.h || a.l-b.l); break;
+    case 's': arr.sort((a,b)=>a.s-b.s); break;
+    case 'l': arr.sort((a,b)=>a.l-b.l); break;
+  }
+  colors = colors.filter(c=>c.collection!==currentCollection).concat(arr);
+}
+
+function exportColors(withHex){
+  let col = colors.filter(c=>c.collection===currentCollection);
+  let text = col.map(c=>withHex?`${c.name} ${c.hex}`:c.name).join('\n');
+  let blob = new Blob([text],{type:'text/plain'});
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `colores_${currentCollection}.txt`;
+  a.click();
 }
 </script>
 
