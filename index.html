@@ -3,108 +3,90 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Color Collector iPad</title>
+<title>Color Collector</title>
 
 <style>
-body {
-  font-family: system-ui, -apple-system;
-  margin: 10px;
-}
-
-#controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
+body { font-family: system-ui; margin: 10px; }
+#controls, #collections { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
 
 #canvasContainer {
   position: relative;
-  width: 100%;
-  max-width: 100%;
-  border: 1px solid #ccc;
-  touch-action: none;
+  border:1px solid #ccc;
+  touch-action: pan-y;
 }
 
 canvas {
-  width: 100%;
-  height: auto;
-  display: block;
+  width:100%;
+  height:auto;
+  display:block;
 }
 
 #lupa {
-  position: absolute;
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  border: 2px solid #000;
-  overflow: hidden;
-  pointer-events: none;
-  display: none;
-  background: white;
+  position:absolute;
+  width:90px; height:90px;
+  border-radius:50%;
+  border:2px solid #000;
+  overflow:hidden;
+  display:none;
+  pointer-events:none;
 }
 
 #lupaCanvas {
-  width: 30px;
-  height: 30px;
-  transform: scale(3);
-  transform-origin: top left;
+  width:30px; height:30px;
+  transform:scale(3);
+  transform-origin:top left;
 }
 
 #infoBox {
-  position: absolute;
-  display: none;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid #aaa;
-  padding: 6px;
-  border-radius: 6px;
-  font-size: 12px;
+  position:absolute;
+  background:white;
+  border:1px solid #aaa;
+  padding:6px;
+  border-radius:6px;
+  display:none;
+  font-size:12px;
 }
 
 #colorPreview {
-  width: 30px;
-  height: 30px;
-  border: 1px solid #000;
-  margin-bottom: 4px;
+  width:30px; height:30px;
+  border:1px solid #000;
+  margin-bottom:4px;
 }
 
 #grid {
-  margin-top: 15px;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
+  display:grid;
+  grid-template-columns:repeat(10,1fr);
+  gap:4px;
+  margin-top:10px;
 }
 
 .colorCell {
-  height: 48px;
-  font-size: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  border: 1px solid #aaa;
-  cursor: pointer;
+  height:50px;
+  font-size:9px;
+  border:1px solid #888;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
 }
 </style>
 </head>
 
 <body>
 
-<h3>Color Collector (iPad)</h3>
+<h3>Color Collector</h3>
 
 <div id="controls">
-  <input type="file" id="imgUpload" accept="image/png, image/jpeg">
-  <select id="sortMode">
-    <option value="h_l">Matiz → claro/oscuro</option>
-    <option value="approx_h_l">Matiz aprox → claro/oscuro</option>
-    <option value="s_l">Saturación → luminosidad</option>
-    <option value="l_s">Luminosidad → saturación</option>
-  </select>
-  <select id="exportMode">
-    <option value="name">Solo nombre</option>
-    <option value="namehex">Nombre + HEX</option>
-  </select>
-  <button id="exportBtn">Exportar</button>
+  <input type="file" id="imgUpload">
+  <button id="togglePick">Modo captura: OFF</button>
+  <button id="calBlack">Calibrar negro</button>
+  <button id="calWhite">Calibrar blanco</button>
+</div>
+
+<div id="collections">
+  <input id="newCollection" placeholder="Nueva colección">
+  <button id="addCollection">Crear</button>
+  <select id="collectionSelect"></select>
 </div>
 
 <div id="canvasContainer">
@@ -117,6 +99,7 @@ canvas {
   <div id="infoBox">
     <div id="colorPreview"></div>
     <input id="colorName" placeholder="Número / nombre">
+    <div id="hexLabel"></div>
     <button id="saveColor">Guardar</button>
   </div>
 </div>
@@ -126,130 +109,149 @@ canvas {
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-
 const lupa = document.getElementById('lupa');
-const lupaCanvas = document.getElementById('lupaCanvas');
-const lupaCtx = lupaCanvas.getContext('2d');
-
+const lupaCtx = document.getElementById('lupaCanvas').getContext('2d');
 const infoBox = document.getElementById('infoBox');
 const colorPreview = document.getElementById('colorPreview');
 const colorName = document.getElementById('colorName');
-
+const hexLabel = document.getElementById('hexLabel');
 const grid = document.getElementById('grid');
-const sortMode = document.getElementById('sortMode');
 
 let img = new Image();
-let colors = [];
+let picking = false;
 let currentColor = null;
 
+let blackRef = 0;
+let whiteRef = 255;
+
+let collections = {};
+let activeCollection = null;
+
+// ---------- utils ----------
 function rgbToHex(r,g,b){
   return "#" + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1).toUpperCase();
 }
 
-function rgbToHsl(r,g,b){
-  r/=255; g/=255; b/=255;
-  let max=Math.max(r,g,b), min=Math.min(r,g,b);
-  let h=0, s=0, l=(max+min)/2;
-  if(max!==min){
-    let d=max-min;
-    s=l>0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max){
-      case r: h=(g-b)/d+(g<b?6:0); break;
-      case g: h=(b-r)/d+2; break;
-      case b: h=(r-g)/d+4; break;
-    }
-    h/=6;
-  }
-  return {h:Math.round(h*360), s:Math.round(s*100), l:Math.round(l*100)};
+function applyCalibration(v){
+  return Math.min(255, Math.max(0, (v-blackRef)*(255/(whiteRef-blackRef))));
 }
 
-document.getElementById('imgUpload').onchange = e => {
+// ---------- image ----------
+document.getElementById('imgUpload').onchange = e=>{
   img.src = URL.createObjectURL(e.target.files[0]);
 };
 
-img.onload = () => {
+img.onload = ()=>{
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
   ctx.drawImage(img,0,0);
 };
 
-function handleTouch(e){
-  e.preventDefault();
-  const touch = e.touches[0];
-  const rect = canvas.getBoundingClientRect();
+// ---------- toggle pick ----------
+document.getElementById('togglePick').onclick=()=>{
+  picking=!picking;
+  canvas.style.pointerEvents = picking ? 'auto':'none';
+  event.target.textContent = `Modo captura: ${picking?'ON':'OFF'}`;
+};
 
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
+// ---------- calibration ----------
+document.getElementById('calBlack').onclick=()=>{
+  if(currentColor) blackRef = currentColor.raw;
+};
 
-  const x = (touch.clientX - rect.left) * scaleX;
-  const y = (touch.clientY - rect.top) * scaleY;
+document.getElementById('calWhite').onclick=()=>{
+  if(currentColor) whiteRef = currentColor.raw;
+};
 
-  if(x<0||y<0||x>=canvas.width||y>=canvas.height) return;
-
-  const imgData = ctx.getImageData(Math.max(0,x-1),Math.max(0,y-1),2,2).data;
-  const r = (imgData[0]+imgData[4]+imgData[8]+imgData[12]) / 4;
-  const g = (imgData[1]+imgData[5]+imgData[9]+imgData[13]) / 4;
-  const b = (imgData[2]+imgData[6]+imgData[10]+imgData[14]) / 4;
-
-  const hex = rgbToHex(r|0,g|0,b|0);
-  const hsl = rgbToHsl(r,g,b);
-  currentColor = {hex, ...hsl};
-
-  // lupa
-  lupa.style.display = 'block';
-  lupa.style.left = (touch.clientX - 45) + 'px';
-  lupa.style.top = (touch.clientY - 100) + 'px';
-
-  lupaCtx.imageSmoothingEnabled = false;
-  lupaCtx.clearRect(0,0,30,30);
-  lupaCtx.drawImage(canvas, x-5, y-5, 10, 10, 0, 0, 30, 30);
-
-  // info
-  infoBox.style.display = 'block';
-  infoBox.style.left = (touch.clientX + 15) + 'px';
-  infoBox.style.top = (touch.clientY - 20) + 'px';
-
-  colorPreview.style.background = hex;
-}
-
+// ---------- touch ----------
 canvas.addEventListener('touchstart', handleTouch);
 canvas.addEventListener('touchmove', handleTouch);
 
-document.getElementById('saveColor').onclick = () => {
-  if(!currentColor || !colorName.value.trim()) return;
-  colors.push({...currentColor, name: colorName.value});
-  colorName.value = '';
+function handleTouch(e){
+  if(!picking) return;
+  e.preventDefault();
+
+  const t = e.touches[0];
+  const r = canvas.getBoundingClientRect();
+  const x = (t.clientX-r.left)*(canvas.width/r.width);
+  const y = (t.clientY-r.top)*(canvas.height/r.height);
+
+  const d = ctx.getImageData(x-1,y-1,2,2).data;
+  let rr=(d[0]+d[4]+d[8]+d[12])/4;
+  let gg=(d[1]+d[5]+d[9]+d[13])/4;
+  let bb=(d[2]+d[6]+d[10]+d[14])/4;
+
+  const raw = rr;
+  rr = applyCalibration(rr)|0;
+  gg = applyCalibration(gg)|0;
+  bb = applyCalibration(bb)|0;
+
+  const hex = rgbToHex(rr,gg,bb);
+  currentColor = {hex, raw};
+
+  lupa.style.display='block';
+  lupa.style.left=(t.clientX-45)+'px';
+  lupa.style.top=(t.clientY-100)+'px';
+  lupaCtx.imageSmoothingEnabled=false;
+  lupaCtx.drawImage(canvas,x-5,y-5,10,10,0,0,30,30);
+
+  infoBox.style.display='block';
+  infoBox.style.left=(t.clientX+10)+'px';
+  infoBox.style.top=(t.clientY-10)+'px';
+
+  colorPreview.style.background=hex;
+  hexLabel.textContent=hex;
+}
+
+// ---------- collections ----------
+document.getElementById('addCollection').onclick=()=>{
+  const n=document.getElementById('newCollection').value.trim();
+  if(!n) return;
+  collections[n]=[];
+  updateCollections();
+};
+
+function updateCollections(){
+  const sel=document.getElementById('collectionSelect');
+  sel.innerHTML='';
+  Object.keys(collections).forEach(k=>{
+    const o=document.createElement('option');
+    o.textContent=k;
+    sel.appendChild(o);
+  });
+  activeCollection=sel.value;
+}
+
+document.getElementById('collectionSelect').onchange=e=>{
+  activeCollection=e.target.value;
   renderGrid();
 };
 
+// ---------- save ----------
+document.getElementById('saveColor').onclick=()=>{
+  if(!activeCollection||!currentColor||!colorName.value) return;
+  collections[activeCollection].push({
+    name: colorName.value,
+    hex: currentColor.hex
+  });
+  colorName.value='';
+  renderGrid();
+};
+
+// ---------- grid ----------
 function renderGrid(){
   grid.innerHTML='';
-  let list=[...colors];
-
-  if(sortMode.value==='h_l') list.sort((a,b)=>a.h-b.h||a.l-b.l);
-  if(sortMode.value==='approx_h_l') list.sort((a,b)=>Math.floor(a.h/30)-Math.floor(b.h/30)||a.l-b.l);
-  if(sortMode.value==='s_l') list.sort((a,b)=>a.s-b.s||a.l-b.l);
-  if(sortMode.value==='l_s') list.sort((a,b)=>a.l-b.l||a.s-b.s);
-
-  list.forEach(c=>{
+  if(!activeCollection) return;
+  collections[activeCollection].forEach(c=>{
     const d=document.createElement('div');
     d.className='colorCell';
     d.style.background=c.hex;
-    d.textContent=c.name;
+    d.innerHTML=`${c.name}<br>${c.hex}`;
     grid.appendChild(d);
   });
 }
-
-document.getElementById('exportBtn').onclick = ()=>{
-  const mode=document.getElementById('exportMode').value;
-  const text=colors.map(c=>mode==='name'?c.name:`${c.name},${c.hex}`).join('\n');
-  const blob=new Blob([text],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='colores.txt';
-  a.click();
-};
 </script>
 
 </body>
-</html> 
+</html>
+
