@@ -7,22 +7,20 @@
 <style>
 body { font-family: Arial, sans-serif; margin: 20px; }
 h1 { text-align: center; }
-#canvasContainer { position: relative; display: inline-block; border: 1px solid #ccc; margin-bottom: 10px; }
-canvas { max-width: 100%; height: auto; }
-#lupa {
-  position: absolute; border: 2px solid #000; border-radius: 50%;
-  width: 80px; height: 80px; overflow: hidden; display: none; pointer-events: none;
-}
-#lupaCanvas { width: 80px; height: 80px; transform: scale(4); transform-origin: top left; }
-#colorBox { width: 40px; height: 40px; display: inline-block; vertical-align: middle; border:1px solid #000; margin-left: 10px; }
-#nameInput { width: 100px; margin-left:10px; }
-#saveBtn { margin-left:10px; }
-#controls { margin-bottom:10px; }
-#collectionSelect { margin-right:10px; }
-#grid { display: grid; grid-template-columns: repeat(10, 50px); grid-gap:5px; margin-top:10px; }
-.colorCell { width:50px; height:50px; position:relative; cursor:pointer; border:1px solid #ccc; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; text-align:center; word-break:break-word; }
+#controls { margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+#canvasContainer { position: relative; display: inline-block; border:1px solid #ccc; margin-bottom:10px; }
+canvas { max-width:100%; height:auto; }
+#lupa { position:absolute; border:2px solid #000; border-radius:50%; width:80px; height:80px; overflow:hidden; display:none; pointer-events:none; }
+#lupaCanvas { width:20px; height:20px; transform:scale(4); transform-origin:top left; }
+#colorBox { width:40px; height:40px; display:inline-block; border:1px solid #000; position:absolute; display:none; }
+#nameInput { width:100px; position:absolute; display:none; }
+#saveBtn { position:absolute; display:none; }
+#grid { display:grid; grid-template-columns:repeat(10,50px); grid-gap:5px; margin-top:10px; }
+.colorCell { width:50px; height:50px; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; text-align:center; word-break:break-word; border:1px solid #ccc; cursor:pointer;}
 .colorCell button { position:absolute; top:0; right:0; font-size:10px; }
-#exportBtn { margin-top:10px; }
+#palettes { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+.palette { display:flex; gap:2px; }
+.palette .cell { width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:8px; flex-direction:column; border:1px solid #ccc;}
 </style>
 </head>
 <body>
@@ -35,10 +33,15 @@ canvas { max-width: 100%; height: auto; }
   <button id="newCollectionBtn">Nueva Colección</button>
   <select id="sortSelect">
     <option value="h_l">Matiz exacto → Claro-Oscuro</option>
-    <option value="approx_h_l">Matiz aproximado → Claro-Oscuro</option>
+    <option value="approx_h_l">Matiz aprox → Claro-Oscuro</option>
     <option value="s_l">Saturación → Luminosidad</option>
     <option value="l_s">Luminosidad → Saturación</option>
   </select>
+  <select id="exportMode">
+    <option value="name">Solo número/nombre</option>
+    <option value="namehex">Número/nombre + HEX</option>
+  </select>
+  <button id="exportBtn">Exportar Colores</button>
 </div>
 
 <div id="canvasContainer">
@@ -46,13 +49,13 @@ canvas { max-width: 100%; height: auto; }
   <div id="lupa">
     <canvas id="lupaCanvas" width="20" height="20"></canvas>
   </div>
-  <input type="text" id="nameInput" placeholder="Número/Nombre" style="position:absolute; display:none;">
-  <div id="colorBox" style="position:absolute; display:none;"></div>
-  <button id="saveBtn" style="position:absolute; display:none;">Guardar</button>
+  <input type="text" id="nameInput" placeholder="Número/Nombre">
+  <div id="colorBox"></div>
+  <button id="saveBtn">Guardar</button>
 </div>
 
 <div id="grid"></div>
-<button id="exportBtn">Exportar Colores</button>
+<div id="palettes"></div>
 
 <script>
 let canvas = document.getElementById('mainCanvas');
@@ -70,17 +73,19 @@ let collectionSelect = document.getElementById('collectionSelect');
 let newCollectionBtn = document.getElementById('newCollectionBtn');
 let sortSelect = document.getElementById('sortSelect');
 let exportBtn = document.getElementById('exportBtn');
+let exportMode = document.getElementById('exportMode');
+let palettesDiv = document.getElementById('palettes');
 
-let collections = {}; 
+let collections = {};
 let currentCollection = "Default";
 collections[currentCollection] = [];
-
 collectionSelect.innerHTML = `<option>${currentCollection}</option>`;
+
+let calibration = {black:null, white:null, factor:1};
 
 function rgbToHex(r,g,b){
   return "#" + ((1 << 24) + (r <<16) + (g<<8) + b).toString(16).slice(1).toUpperCase();
 }
-
 function rgbToHsl(r,g,b){
   r/=255; g/=255; b/=255;
   let max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -95,9 +100,8 @@ function rgbToHsl(r,g,b){
     }
     h/=6;
   }
-  return {h:sanitize(h*360),s:s*100,l:l*100};
+  return {h:Math.round(h*360), s:Math.round(s*100), l:Math.round(l*100)};
 }
-function sanitize(x){return Math.round(x*100)/100;}
 
 function drawGrid(){
   grid.innerHTML='';
@@ -107,7 +111,7 @@ function drawGrid(){
   else if(mode==="approx_h_l") sorted.sort((a,b)=>Math.floor(a.h/30) - Math.floor(b.h/30) || a.l - b.l);
   else if(mode==="s_l") sorted.sort((a,b)=>a.s - b.s || a.l - b.l);
   else if(mode==="l_s") sorted.sort((a,b)=>a.l - b.l || a.s - b.s);
-  sorted.forEach((c,i)=>{
+  sorted.forEach(c=>{
     let div=document.createElement('div');
     div.className='colorCell';
     div.style.background=c.hex;
@@ -121,13 +125,20 @@ function drawGrid(){
 }
 
 function generatePalettes(color){
-  let paletas = [];
-  for(let i=0;i<5;i++){
-    let pal = collections[currentCollection].sort(()=>0.5-Math.random()).slice(0,5);
-    paletas.push(pal);
+  palettesDiv.innerHTML='';
+  let palCount=5;
+  for(let i=0;i<palCount;i++){
+    let pal = [...collections[currentCollection]];
+    pal = pal.sort(()=>0.5-Math.random()).slice(0,5);
+    let palDiv = document.createElement('div'); palDiv.className='palette';
+    pal.forEach(c=>{
+      let cell = document.createElement('div'); cell.className='cell';
+      cell.style.background=c.hex;
+      cell.innerHTML=`${c.name}<br>${c.hex}`;
+      palDiv.appendChild(cell);
+    });
+    palettesDiv.appendChild(palDiv);
   }
-  console.log("Paletas generadas:",paletas);
-  alert("Paletas generadas en consola. Implementa visualización si quieres.");
 }
 
 imgUpload.addEventListener('change',e=>{
@@ -148,41 +159,53 @@ canvas.addEventListener('mousemove',e=>{
   let x = Math.floor(e.clientX - rect.left);
   let y = Math.floor(e.clientY - rect.top);
   if(x<0||y<0||x>=canvas.width||y>=canvas.height) return;
-  let pixel = ctx.getImageData(x,y,2,2).data;
-  let r = (pixel[0]+pixel[4]+pixel[8]+pixel[12])/4;
-  let g = (pixel[1]+pixel[5]+pixel[9]+pixel[13])/4;
-  let b = (pixel[2]+pixel[6]+pixel[10]+pixel[14])/4;
-  let hex = rgbToHex(Math.round(r),Math.round(g),Math.round(b));
-  let hsl = rgbToHsl(r,g,b);
-  
+
+  let pixel = ctx.getImageData(x-1,y-1,2,2).data;
+  let r=(pixel[0]+pixel[4]+pixel[8]+pixel[12])/4;
+  let g=(pixel[1]+pixel[5]+pixel[9]+pixel[13])/4;
+  let b=(pixel[2]+pixel[6]+pixel[10]+pixel[14])/4;
+
+  // Aplicar calibración negro/blanco si existe
+  if(calibration.black && calibration.white){
+    let factor = 255/(calibration.white[0]-calibration.black[0]);
+    r=Math.min(Math.max((r-calibration.black[0])*factor,0),255);
+    g=Math.min(Math.max((g-calibration.black[1])*factor,0),255);
+    b=Math.min(Math.max((b-calibration.black[2])*factor,0),255);
+  }
+
+  let hex=rgbToHex(Math.round(r),Math.round(g),Math.round(b));
+  let hsl=rgbToHsl(r,g,b);
+
   // Lupa
   lupa.style.display='block';
   lupa.style.left=(x-40)+'px';
   lupa.style.top=(y-40)+'px';
   lupaCtx.clearRect(0,0,20,20);
-  lupaCtx.drawImage(canvas, x-10, y-10, 20, 20, 0,0,20,20);
-  
-  // Caja color y nombre
-  colorBox.style.display='block';
-  colorBox.style.left=(x+50)+'px';
-  colorBox.style.top=(y)+'px';
-  colorBox.style.background=hex;
-  
-  nameInput.style.display='block';
-  nameInput.style.left=(x+100)+'px';
-  nameInput.style.top=(y)+'px';
-  nameInput.value='';
-  
-  saveBtn.style.display='block';
-  saveBtn.style.left=(x+210)+'px';
-  saveBtn.style.top=(y)+'px';
-  
+  lupaCtx.drawImage(canvas,x-10,y-10,20,20,0,0,20,20);
+
+  // Color y input
+  colorBox.style.display='block'; colorBox.style.left=(x+50)+'px'; colorBox.style.top=(y)+'px'; colorBox.style.background=hex;
+  nameInput.style.display='block'; nameInput.style.left=(x+100)+'px'; nameInput.style.top=(y)+'px'; nameInput.value='';
+  saveBtn.style.display='block'; saveBtn.style.left=(x+210)+'px'; saveBtn.style.top=(y)+'px';
+
   saveBtn.onclick=()=>{
     if(nameInput.value.trim()==='') return;
     collections[currentCollection].push({hex:hex,name:nameInput.value,h:hsl.h,s:hsl.s,l:hsl.l});
     drawGrid();
     nameInput.value='';
   }
+});
+
+// Calibración negro/blanco: clic derecho
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  let rect = canvas.getBoundingClientRect();
+  let x = Math.floor(e.clientX - rect.left);
+  let y = Math.floor(e.clientY - rect.top);
+  let data = ctx.getImageData(x,y,1,1).data;
+  if(!calibration.black) {calibration.black=[data[0],data[1],data[2]]; alert('Negro calibrado');}
+  else if(!calibration.white) {calibration.white=[data[0],data[1],data[2]]; alert('Blanco calibrado');}
+  else {calibration.black=null; calibration.white=null; alert('Calibración reiniciada');}
 });
 
 newCollectionBtn.onclick=()=>{
@@ -202,13 +225,13 @@ collectionSelect.addEventListener('change',e=>{
 sortSelect.addEventListener('change',drawGrid);
 
 exportBtn.onclick=()=>{
-  let data = collections[currentCollection].map(c=>`${c.name},${c.hex}`).join('\n');
+  let data='';
+  if(exportMode.value==='name') data = collections[currentCollection].map(c=>`${c.name}`).join('\n');
+  else data = collections[currentCollection].map(c=>`${c.name},${c.hex}`).join('\n');
   let blob = new Blob([data],{type:'text/plain'});
   let url = URL.createObjectURL(blob);
-  let a=document.createElement('a');
-  a.href=url; a.download=`${currentCollection}.txt`; a.click();
+  let a=document.createElement('a'); a.href=url; a.download=`${currentCollection}.txt`; a.click();
 }
-
 </script>
 
 </body>
