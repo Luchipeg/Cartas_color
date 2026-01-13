@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Color Collector Deluxe</title>
+<title>Color Collector Deluxe - iPad</title>
 <style>
-body { font-family: Arial, sans-serif; margin: 20px; }
+body { font-family: Arial, sans-serif; margin: 10px; }
 h1 { text-align: center; }
 #controls { margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-#canvasContainer { position: relative; display: inline-block; border:1px solid #ccc; margin-bottom:10px; }
+#canvasContainer { position: relative; display: inline-block; border:1px solid #ccc; margin-bottom:10px; touch-action: none; }
 canvas { max-width:100%; height:auto; }
 #lupa { position:absolute; border:2px solid #000; border-radius:50%; width:80px; height:80px; overflow:hidden; display:none; pointer-events:none; }
 #lupaCanvas { width:20px; height:20px; transform:scale(4); transform-origin:top left; }
@@ -25,7 +25,7 @@ canvas { max-width:100%; height:auto; }
 </head>
 <body>
 
-<h1>Color Collector Deluxe</h1>
+<h1>Color Collector Deluxe - iPad</h1>
 
 <div id="controls">
   <input type="file" id="imgUpload" accept="image/png, image/jpeg">
@@ -37,6 +37,8 @@ canvas { max-width:100%; height:auto; }
     <option value="s_l">Saturación → Luminosidad</option>
     <option value="l_s">Luminosidad → Saturación</option>
   </select>
+  <button id="calBlack">Calibrar Negro</button>
+  <button id="calWhite">Calibrar Blanco</button>
   <select id="exportMode">
     <option value="name">Solo número/nombre</option>
     <option value="namehex">Número/nombre + HEX</option>
@@ -58,65 +60,36 @@ canvas { max-width:100%; height:auto; }
 <div id="palettes"></div>
 
 <script>
-let canvas = document.getElementById('mainCanvas');
-let ctx = canvas.getContext('2d');
-let img = new Image();
-let lupa = document.getElementById('lupa');
-let lupaCanvas = document.getElementById('lupaCanvas');
-let lupaCtx = lupaCanvas.getContext('2d');
-let nameInput = document.getElementById('nameInput');
-let colorBox = document.getElementById('colorBox');
-let saveBtn = document.getElementById('saveBtn');
-let grid = document.getElementById('grid');
-let imgUpload = document.getElementById('imgUpload');
-let collectionSelect = document.getElementById('collectionSelect');
-let newCollectionBtn = document.getElementById('newCollectionBtn');
-let sortSelect = document.getElementById('sortSelect');
-let exportBtn = document.getElementById('exportBtn');
-let exportMode = document.getElementById('exportMode');
-let palettesDiv = document.getElementById('palettes');
+let canvas=document.getElementById('mainCanvas'), ctx=canvas.getContext('2d');
+let img=new Image();
+let lupa=document.getElementById('lupa'), lupaCanvas=document.getElementById('lupaCanvas'), lupaCtx=lupaCanvas.getContext('2d');
+let nameInput=document.getElementById('nameInput'), colorBox=document.getElementById('colorBox'), saveBtn=document.getElementById('saveBtn');
+let grid=document.getElementById('grid'), imgUpload=document.getElementById('imgUpload');
+let collectionSelect=document.getElementById('collectionSelect'), newCollectionBtn=document.getElementById('newCollectionBtn');
+let sortSelect=document.getElementById('sortSelect'), exportBtn=document.getElementById('exportBtn'), exportMode=document.getElementById('exportMode');
+let palettesDiv=document.getElementById('palettes');
+let calBlack=document.getElementById('calBlack'), calWhite=document.getElementById('calWhite');
 
-let collections = {};
-let currentCollection = "Default";
-collections[currentCollection] = [];
-collectionSelect.innerHTML = `<option>${currentCollection}</option>`;
+let collections={}; let currentCollection="Default"; collections[currentCollection]=[];
+collectionSelect.innerHTML=`<option>${currentCollection}</option>`;
 
-let calibration = {black:null, white:null, factor:1};
+let calibration={black:null, white:null};
 
-function rgbToHex(r,g,b){
-  return "#" + ((1 << 24) + (r <<16) + (g<<8) + b).toString(16).slice(1).toUpperCase();
-}
-function rgbToHsl(r,g,b){
-  r/=255; g/=255; b/=255;
-  let max=Math.max(r,g,b), min=Math.min(r,g,b);
-  let h=0, s=0, l=(max+min)/2;
-  if(max!=min){
-    let d=max-min;
-    s=l>0.5?d/(2-max-min):d/(max+min);
-    switch(max){
-      case r: h=(g-b)/d+(g<b?6:0); break;
-      case g: h=(b-r)/d+2; break;
-      case b: h=(r-g)/d+4; break;
-    }
-    h/=6;
-  }
-  return {h:Math.round(h*360), s:Math.round(s*100), l:Math.round(l*100)};
-}
+function rgbToHex(r,g,b){return "#" + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1).toUpperCase();}
+function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;let max=Math.max(r,g,b),min=Math.min(r,g,b);let h=0,s=0,l=(max+min)/2;if(max!=min){let d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h/=6;}return {h:Math.round(h*360),s:Math.round(s*100),l:Math.round(l*100)};}
 
 function drawGrid(){
   grid.innerHTML='';
-  let sorted = [...collections[currentCollection]];
-  let mode = sortSelect.value;
-  if(mode==="h_l") sorted.sort((a,b)=>a.h - b.h || a.l - b.l);
-  else if(mode==="approx_h_l") sorted.sort((a,b)=>Math.floor(a.h/30) - Math.floor(b.h/30) || a.l - b.l);
-  else if(mode==="s_l") sorted.sort((a,b)=>a.s - b.s || a.l - b.l);
-  else if(mode==="l_s") sorted.sort((a,b)=>a.l - b.l || a.s - b.s);
+  let sorted=[...collections[currentCollection]];
+  let mode=sortSelect.value;
+  if(mode==="h_l") sorted.sort((a,b)=>a.h-b.h||a.l-b.l);
+  else if(mode==="approx_h_l") sorted.sort((a,b)=>Math.floor(a.h/30)-Math.floor(b.h/30)||a.l-b.l);
+  else if(mode==="s_l") sorted.sort((a,b)=>a.s-b.s||a.l-b.l);
+  else if(mode==="l_s") sorted.sort((a,b)=>a.l-b.l||a.s-b.s);
   sorted.forEach(c=>{
-    let div=document.createElement('div');
-    div.className='colorCell';
-    div.style.background=c.hex;
+    let div=document.createElement('div'); div.className='colorCell'; div.style.background=c.hex;
     div.innerHTML=`${c.name}<br>${c.hex}`;
-    let delBtn = document.createElement('button'); delBtn.textContent='X';
+    let delBtn=document.createElement('button'); delBtn.textContent='X';
     delBtn.onclick=()=>{collections[currentCollection].splice(collections[currentCollection].indexOf(c),1); drawGrid();}
     div.appendChild(delBtn);
     div.onclick=()=>{generatePalettes(c)};
@@ -128,13 +101,12 @@ function generatePalettes(color){
   palettesDiv.innerHTML='';
   let palCount=5;
   for(let i=0;i<palCount;i++){
-    let pal = [...collections[currentCollection]];
-    pal = pal.sort(()=>0.5-Math.random()).slice(0,5);
-    let palDiv = document.createElement('div'); palDiv.className='palette';
+    let pal=[...collections[currentCollection]];
+    pal=pal.sort(()=>0.5-Math.random()).slice(0,5);
+    let palDiv=document.createElement('div'); palDiv.className='palette';
     pal.forEach(c=>{
-      let cell = document.createElement('div'); cell.className='cell';
-      cell.style.background=c.hex;
-      cell.innerHTML=`${c.name}<br>${c.hex}`;
+      let cell=document.createElement('div'); cell.className='cell';
+      cell.style.background=c.hex; cell.innerHTML=`${c.name}<br>${c.hex}`;
       palDiv.appendChild(cell);
     });
     palettesDiv.appendChild(palDiv);
@@ -142,32 +114,29 @@ function generatePalettes(color){
 }
 
 imgUpload.addEventListener('change',e=>{
-  let file=e.target.files[0];
-  if(!file) return;
-  let url=URL.createObjectURL(file);
-  img.src=url;
+  let file=e.target.files[0]; if(!file) return;
+  img.src=URL.createObjectURL(file);
 });
 
 img.onload=()=>{
-  canvas.width=img.width;
-  canvas.height=img.height;
-  ctx.drawImage(img,0,0);
+  canvas.width=img.width; canvas.height=img.height; ctx.drawImage(img,0,0);
 };
 
-canvas.addEventListener('mousemove',e=>{
-  let rect = canvas.getBoundingClientRect();
-  let x = Math.floor(e.clientX - rect.left);
-  let y = Math.floor(e.clientY - rect.top);
+function handleTouch(e){
+  e.preventDefault();
+  let touch=e.touches[0];
+  let rect=canvas.getBoundingClientRect();
+  let x=Math.floor(touch.clientX-rect.left);
+  let y=Math.floor(touch.clientY-rect.top);
   if(x<0||y<0||x>=canvas.width||y>=canvas.height) return;
 
-  let pixel = ctx.getImageData(x-1,y-1,2,2).data;
-  let r=(pixel[0]+pixel[4]+pixel[8]+pixel[12])/4;
-  let g=(pixel[1]+pixel[5]+pixel[9]+pixel[13])/4;
-  let b=(pixel[2]+pixel[6]+pixel[10]+pixel[14])/4;
+  let data=ctx.getImageData(Math.max(0,x-1),Math.max(0,y-1),2,2).data;
+  let r=(data[0]+data[4]+data[8]+data[12])/4;
+  let g=(data[1]+data[5]+data[9]+data[13])/4;
+  let b=(data[2]+data[6]+data[10]+data[14])/4;
 
-  // Aplicar calibración negro/blanco si existe
   if(calibration.black && calibration.white){
-    let factor = 255/(calibration.white[0]-calibration.black[0]);
+    let factor=255/(calibration.white[0]-calibration.black[0]);
     r=Math.min(Math.max((r-calibration.black[0])*factor,0),255);
     g=Math.min(Math.max((g-calibration.black[1])*factor,0),255);
     b=Math.min(Math.max((b-calibration.black[2])*factor,0),255);
@@ -177,11 +146,8 @@ canvas.addEventListener('mousemove',e=>{
   let hsl=rgbToHsl(r,g,b);
 
   // Lupa
-  lupa.style.display='block';
-  lupa.style.left=(x-40)+'px';
-  lupa.style.top=(y-40)+'px';
-  lupaCtx.clearRect(0,0,20,20);
-  lupaCtx.drawImage(canvas,x-10,y-10,20,20,0,0,20,20);
+  lupa.style.display='block'; lupa.style.left=(x-40)+'px'; lupa.style.top=(y-40)+'px';
+  lupaCtx.clearRect(0,0,20,20); lupaCtx.drawImage(canvas,x-10,y-10,20,20,0,0,20,20);
 
   // Color y input
   colorBox.style.display='block'; colorBox.style.left=(x+50)+'px'; colorBox.style.top=(y)+'px'; colorBox.style.background=hex;
@@ -194,42 +160,54 @@ canvas.addEventListener('mousemove',e=>{
     drawGrid();
     nameInput.value='';
   }
-});
+}
 
-// Calibración negro/blanco: clic derecho
-canvas.addEventListener('contextmenu',e=>{
-  e.preventDefault();
-  let rect = canvas.getBoundingClientRect();
-  let x = Math.floor(e.clientX - rect.left);
-  let y = Math.floor(e.clientY - rect.top);
-  let data = ctx.getImageData(x,y,1,1).data;
-  if(!calibration.black) {calibration.black=[data[0],data[1],data[2]]; alert('Negro calibrado');}
-  else if(!calibration.white) {calibration.white=[data[0],data[1],data[2]]; alert('Blanco calibrado');}
-  else {calibration.black=null; calibration.white=null; alert('Calibración reiniciada');}
-});
+canvas.addEventListener('touchstart', handleTouch);
+canvas.addEventListener('touchmove', handleTouch);
+
+calBlack.onclick=()=>{
+  alert('Toca el color negro en la imagen');
+  canvas.addEventListener('touchstart', function calBlackTouch(e){
+    e.preventDefault(); let touch=e.touches[0];
+    let rect=canvas.getBoundingClientRect();
+    let x=Math.floor(touch.clientX-rect.left);
+    let y=Math.floor(touch.clientY-rect.top);
+    let data=ctx.getImageData(x,y,1,1).data;
+    calibration.black=[data[0],data[1],data[2]];
+    alert('Negro calibrado');
+    canvas.removeEventListener('touchstart',calBlackTouch);
+  });
+};
+
+calWhite.onclick=()=>{
+  alert('Toca el color blanco en la imagen');
+  canvas.addEventListener('touchstart', function calWhiteTouch(e){
+    e.preventDefault(); let touch=e.touches[0];
+    let rect=canvas.getBoundingClientRect();
+    let x=Math.floor(touch.clientX-rect.left);
+    let y=Math.floor(touch.clientY-rect.top);
+    let data=ctx.getImageData(x,y,1,1).data;
+    calibration.white=[data[0],data[1],data[2]];
+    alert('Blanco calibrado');
+    canvas.removeEventListener('touchstart',calWhiteTouch);
+  });
+};
 
 newCollectionBtn.onclick=()=>{
   let name=prompt("Nombre de la nueva colección:");
-  if(!name) return;
-  if(collections[name]) {alert("Ya existe"); return;}
-  collections[name]=[];
-  let opt=document.createElement('option'); opt.text=name; collectionSelect.add(opt);
+  if(!name) return; if(collections[name]){alert("Ya existe");return;}
+  collections[name]=[]; let opt=document.createElement('option'); opt.text=name; collectionSelect.add(opt);
   collectionSelect.value=name; currentCollection=name; drawGrid();
 }
 
-collectionSelect.addEventListener('change',e=>{
-  currentCollection=e.target.value;
-  drawGrid();
-});
-
+collectionSelect.addEventListener('change',e=>{currentCollection=e.target.value; drawGrid();});
 sortSelect.addEventListener('change',drawGrid);
 
 exportBtn.onclick=()=>{
   let data='';
-  if(exportMode.value==='name') data = collections[currentCollection].map(c=>`${c.name}`).join('\n');
-  else data = collections[currentCollection].map(c=>`${c.name},${c.hex}`).join('\n');
-  let blob = new Blob([data],{type:'text/plain'});
-  let url = URL.createObjectURL(blob);
+  if(exportMode.value==='name') data=collections[currentCollection].map(c=>c.name).join('\n');
+  else data=collections[currentCollection].map(c=>`${c.name},${c.hex}`).join('\n');
+  let blob=new Blob([data],{type:'text/plain'}); let url=URL.createObjectURL(blob);
   let a=document.createElement('a'); a.href=url; a.download=`${currentCollection}.txt`; a.click();
 }
 </script>
