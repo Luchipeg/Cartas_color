@@ -1,21 +1,25 @@
- <!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cartas de Color Deluxe</title>
 <style>
-  body { font-family: sans-serif; padding: 10px; }
-  h1 { text-align:center; }
-  #canvas-container { position: relative; display: inline-block; border:1px solid #ccc; margin-bottom:10px; }
-  canvas { max-width: 100%; display:block; }
-  #lupa { position:absolute; border:2px solid #000; width:80px; height:80px; border-radius:50%; overflow:hidden; display:none; pointer-events:none; }
-  #color-box { width:30px; height:30px; display:inline-block; border:1px solid #000; vertical-align:middle; margin-left:5px; }
-  #name-input { width: 80px; vertical-align:middle; margin-left:5px; }
-  button { margin:2px; }
-  #tabla-colores { display:grid; grid-template-columns: repeat(10, 1fr); gap:5px; margin-top:10px; }
-  .color-cell { width:100%; padding-top:100%; position:relative; }
-  .color-cell div { position:absolute; top:0; left:0; right:0; bottom:0; text-align:center; font-size:10px; color:#000; display:flex; flex-direction:column; justify-content:center; align-items:center; border:1px solid #ccc; box-sizing:border-box; }
+body { font-family: sans-serif; padding: 10px; }
+h1 { text-align:center; }
+#canvas-container { position: relative; display: inline-block; border:1px solid #ccc; margin-bottom:10px; }
+canvas { max-width: 100%; display:block; }
+#lupa { position:absolute; border:2px solid #000; width:80px; height:80px; border-radius:50%; overflow:hidden; display:none; pointer-events:none; }
+#lupa-canvas { width:80px; height:80px; }
+#color-box { width:30px; height:30px; display:inline-block; border:1px solid #000; vertical-align:middle; margin-left:5px; }
+#name-input { width: 80px; vertical-align:middle; margin-left:5px; }
+button { margin:2px; }
+#tabla-colores { display:grid; grid-template-columns: repeat(10, 1fr); gap:5px; margin-top:10px; }
+.color-cell { width:100%; padding-top:100%; position:relative; }
+.color-cell div { position:absolute; top:0; left:0; right:0; bottom:0; text-align:center; font-size:10px; color:#000; display:flex; flex-direction:column; justify-content:center; align-items:center; border:1px solid #ccc; box-sizing:border-box; }
+#paletas { margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; }
+.paleta { border:1px solid #ccc; padding:5px; display:flex; flex-direction:column; }
+.paleta-color { width:40px; height:40px; margin:2px; display:flex; align-items:center; justify-content:center; font-size:9px; flex-direction:column; color:#000; border:1px solid #999; }
 </style>
 </head>
 <body>
@@ -35,8 +39,10 @@
 <button id="calibrar-negro">Calibrar negro</button>
 <button id="calibrar-blanco">Calibrar blanco</button>
 <button id="exportar">Exportar</button>
+<button id="generar-paletas">Generar Paletas</button>
 
 <div id="tabla-colores"></div>
+<div id="paletas"></div>
 
 <script>
 // Variables globales
@@ -48,33 +54,36 @@ let lupaCtx = lupaCanvas.getContext('2d');
 let colorBox = document.getElementById('color-box');
 let nameInput = document.getElementById('name-input');
 let tabla = document.getElementById('tabla-colores');
+let paletasDiv = document.getElementById('paletas');
 
 let img = new Image();
 let colores = [];
-let calibracion = { negro:null, blanco:null };
+let calibracion = { negro:null, blanco:null, factor:null };
 
 // Cargar imagen
 document.getElementById('imgLoader').addEventListener('change', function(e){
+  let file = e.target.files[0];
+  if(!file) return;
   let reader = new FileReader();
   reader.onload = function(event){
     img.onload = function(){
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img,0,0);
+      let scale = Math.min(window.innerWidth / img.width, 1);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     }
     img.src = event.target.result;
   }
-  reader.readAsDataURL(e.target.files[0]);
+  reader.readAsDataURL(file);
 });
 
-// Función HSL
+// HSL
 function hexToHSL(H) {
   let r = parseInt(H.substring(1,3),16)/255;
   let g = parseInt(H.substring(3,5),16)/255;
   let b = parseInt(H.substring(5,7),16)/255;
   let max = Math.max(r,g,b), min = Math.min(r,g,b);
   let h,s,l = (max + min)/2;
-
   if(max==min){h=s=0;}
   else{
     let d = max - min;
@@ -89,42 +98,42 @@ function hexToHSL(H) {
   return {h:h*360, s:s*100, l:l*100};
 }
 
-// Obtener color de píxel (promediando max 4 píxeles)
+// Obtener color y aplicar calibración
 function getColor(x,y){
   let imgData = ctx.getImageData(x,y,2,2).data;
-  let r = 0,g=0,b=0,n=0;
+  let r=0,g=0,b=0,n=0;
   for(let i=0;i<imgData.length;i+=4){
     r+=imgData[i]; g+=imgData[i+1]; b+=imgData[i+2]; n++;
   }
   r=Math.round(r/n); g=Math.round(g/n); b=Math.round(b/n);
-  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+
+  if(calibracion.factor){
+    r = Math.min(255, Math.max(0, Math.round((r - calibracion.negro.r) * calibracion.factor.r)));
+    g = Math.min(255, Math.max(0, Math.round((g - calibracion.negro.g) * calibracion.factor.g)));
+    b = Math.min(255, Math.max(0, Math.round((b - calibracion.negro.b) * calibracion.factor.b)));
+  }
+  return "#" + ((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1);
 }
 
-// Mostrar lupa y actualizar color
+// Lupa
 canvas.addEventListener('mousemove',function(e){
   let rect = canvas.getBoundingClientRect();
   let x = Math.floor(e.clientX - rect.left);
   let y = Math.floor(e.clientY - rect.top);
 
-  // Lupa
   lupa.style.display='block';
   let lupaX = e.clientX - rect.left - 40;
   let lupaY = e.clientY - rect.top - 40;
   lupa.style.left = lupaX + 'px';
   lupa.style.top = lupaY + 'px';
   lupaCtx.clearRect(0,0,80,80);
-  lupaCtx.drawImage(canvas, x-2, y-2,4,4,0,0,80,80);
+  lupaCtx.drawImage(canvas, x-1, y-1, 2,2, 0,0,80,80);
 
-  // Color box
   let c = getColor(x,y);
   colorBox.style.background = c;
-
-  // Guardar el último color seleccionado
   colorBox.dataset.color = c;
 });
-
-// Al salir del canvas ocultar lupa
-canvas.addEventListener('mouseleave',function(){ lupa.style.display='none'; });
+canvas.addEventListener('mouseleave',()=>lupa.style.display='none');
 
 // Guardar color
 document.getElementById('guardar-color').addEventListener('click',function(){
@@ -133,4 +142,154 @@ document.getElementById('guardar-color').addEventListener('click',function(){
   if(!c || !nombre) return;
   let hsl = hexToHSL(c);
   colores.push({nombre, hex:c, h:hsl.h, s:hsl.s, l:hsl.l});
-  name
+  nameInput.value='';
+  actualizarTabla();
+});
+
+// Ordenar
+function familiaColor(h){
+  if(h>=0 && h<30) return 'rojo';
+  if(h>=30 && h<60) return 'naranja';
+  if(h>=60 && h<90) return 'amarillo';
+  if(h>=90 && h<150) return 'verde';
+  if(h>=150 && h<210) return 'verde-azulado';
+  if(h>=210 && h<270) return 'azul';
+  if(h>=270 && h<330) return 'morado';
+  return 'rojo';
+}
+
+function ordenarTabla(criterio){
+  if(criterio=='matiz'){
+    colores.sort((a,b)=>{
+      let famA=familiaColor(a.h), famB=familiaColor(b.h);
+      if(famA!==famB) return famA.localeCompare(famB);
+      return a.l - b.l;
+    });
+  } else if(criterio=='saturacion'){
+    colores.sort((a,b)=>a.s - b.s);
+  } else if(criterio=='luminosidad'){
+    colores.sort((a,b)=>a.l - b.l);
+  }
+  actualizarTabla();
+}
+document.getElementById('ordenar-matiz').addEventListener('click',()=>ordenarTabla('matiz'));
+document.getElementById('ordenar-saturacion').addEventListener('click',()=>ordenarTabla('saturacion'));
+document.getElementById('ordenar-luminosidad').addEventListener('click',()=>ordenarTabla('luminosidad'));
+
+// Actualizar tabla
+function actualizarTabla(){
+  tabla.innerHTML='';
+  colores.forEach((col,i)=>{
+    let div=document.createElement('div');
+    div.className='color-cell';
+    div.innerHTML=`<div style="background:${col.hex}">${col.nombre}<br>${col.hex}<br><button onclick="eliminarColor(${i})">X</button></div>`;
+    tabla.appendChild(div);
+  });
+}
+
+// Eliminar color
+function eliminarColor(i){ colores.splice(i,1); actualizarTabla(); }
+
+// Calibración
+canvas.addEventListener('click',function(e){
+  let rect = canvas.getBoundingClientRect();
+  let x = Math.floor(e.clientX - rect.left);
+  let y = Math.floor(e.clientY - rect.top);
+  let imgData = ctx.getImageData(x,y,1,1).data;
+  let c = {r:imgData[0],g:imgData[1],b:imgData[2]};
+
+  if(canvas.dataset.calNegro==='true'){ 
+    calibracion.negro=c; 
+    alert('Negro calibrado'); 
+    canvas.dataset.calNegro='false'; 
+  }
+  if(canvas.dataset.calBlanco==='true'){ 
+    calibracion.blanco=c; 
+    alert('Blanco calibrado'); 
+    canvas.dataset.calBlanco='false'; 
+  }
+  if(calibracion.negro && calibracion.blanco){
+    calibracion.factor = {
+      r: 255/(calibracion.blanco.r - calibracion.negro.r),
+      g: 255/(calibracion.blanco.g - calibracion.negro.g),
+      b: 255/(calibracion.blanco.b - calibracion.negro.b)
+    };
+  }
+});
+
+document.getElementById('calibrar-negro').addEventListener('click',()=>{
+  canvas.dataset.calNegro='true'; canvas.dataset.calBlanco='false'; alert('Toca el pixel negro en la imagen');
+});
+document.getElementById('calibrar-blanco').addEventListener('click',()=>{
+  canvas.dataset.calBlanco='true'; canvas.dataset.calNegro='false'; alert('Toca el pixel blanco en la imagen');
+});
+
+// Exportar
+document.getElementById('exportar').addEventListener('click',()=>{
+  let data = colores.map(c=>`${c.nombre},${c.hex}`).join('\n');
+  let blob = new Blob([data],{type:'text/plain'});
+  let url = URL.createObjectURL(blob);
+  let a = document.createElement('a');
+  a.href=url; a.download='colores.txt'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Generar paletas armónicas
+function hueDistance(h1,h2){ let d=Math.abs(h1-h2); return Math.min(d,360-d); }
+document.getElementById('generar-paletas').addEventListener('click',()=>{
+  paletasDiv.innerHTML='';
+  colores.forEach(base=>{
+    const tipos = ['análogo','complementario','triádico','tetrádico'];
+    tipos.forEach(tipo=>{
+      let paleta = document.createElement('div'); paleta.className='paleta';
+      let palColores = [base];
+      let candidatos = colores.filter(c=>c!=base);
+
+      function buscarHue(targetHue){
+        let mejor = null; let minDist = 360;
+        candidatos.forEach(c=>{
+          let d = hueDistance(c.h, targetHue);
+          if(d<minDist){ mejor=c; minDist=d; }
+        });
+        if(mejor){ candidatos = candidatos.filter(c=>c!=mejor); return mejor; }
+        return null;
+      }
+
+      if(tipo==='análogo'){
+        palColores.push(buscarHue((base.h+30)%360));
+        palColores.push(buscarHue((base.h+330)%360));
+        palColores.push(buscarHue((base.h+15)%360));
+        palColores.push(buscarHue((base.h+345)%360));
+      } else if(tipo==='complementario'){
+        palColores.push(buscarHue((base.h+180)%360));
+        palColores.push(buscarHue((base.h+170)%360));
+        palColores.push(buscarHue((base.h+190)%360));
+        palColores.push(buscarHue((base.h+160)%360));
+      } else if(tipo==='triádico'){
+        palColores.push(buscarHue((base.h+120)%360));
+        palColores.push(buscarHue((base.h+240)%360));
+        palColores.push(buscarHue((base.h+110)%360));
+        palColores.push(buscarHue((base.h+230)%360));
+      } else if(tipo==='tetrádico'){
+        palColores.push(buscarHue((base.h+60)%360));
+        palColores.push(buscarHue((base.h+180)%360));
+        palColores.push(buscarHue((base.h+240)%360));
+        palColores.push(buscarHue((base.h+300)%360));
+      }
+
+      palColores.forEach(c=>{
+        if(c){
+          let div=document.createElement('div');
+          div.className='paleta-color';
+          div.style.background=c.hex;
+          div.innerHTML=`${c.nombre}<br>${c.hex}`;
+          paleta.appendChild(div);
+        }
+      });
+      paletasDiv.appendChild(paleta);
+    });
+  });
+});
+</script>
+</body>
+</html>
